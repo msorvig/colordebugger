@@ -2,7 +2,7 @@ import ciexyz
 import colormodels
 
 begin_wl = 360 # hardcoded in get_normalized_spectral_line_colors
-end_wl = 830 
+end_wl = 830
 delta_wl = 20
 
 xyz_list = ciexyz.get_normalized_spectral_line_colors (brightness=1.0, dwl_angstroms=delta_wl * 10)

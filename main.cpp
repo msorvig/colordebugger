@@ -23,7 +23,7 @@ static qreal sRGBtoXYZData[] =
       0.2126729, 0.7151522, 0.0721750,
       0.0193339, 0.1191920, 0.9503041 };
 
-static qreal adobeRGBtoXYZData[] = 
+static qreal adobeRGBtoXYZData[] =
     { 0.5767309, 0.1855540, 0.1881852,
       0.2973769, 0.6273491, 0.0752741,
       0.0270343, 0.0706872, 0.9911085 };
@@ -33,15 +33,15 @@ static qreal proPhotoXYZData[] =
        0.2880402, 0.7118741, 0.0000857,
        0.0000000, 0.0000000, 0.8252100 };
 
-static QGenericMatrix<3, 3, qreal> rgbToXYZMatrices[ColorSpaceCount] = 
-{ 
+static QGenericMatrix<3, 3, qreal> rgbToXYZMatrices[ColorSpaceCount] =
+{
     QGenericMatrix<3, 3, qreal>(sRGBtoXYZData),
     QGenericMatrix<3, 3, qreal>(adobeRGBtoXYZData),
     QGenericMatrix<3, 3, qreal>(proPhotoXYZData)
 };
 
-static QGenericMatrix<3, 3, qreal> XYZtoRGBMatrices[ColorSpaceCount] = 
-{ 
+static QGenericMatrix<3, 3, qreal> XYZtoRGBMatrices[ColorSpaceCount] =
+{
     rgbToXYZMatrices[sRGB].transposed(),
     rgbToXYZMatrices[AdobeRGB].transposed(),
     rgbToXYZMatrices[ProPhotoRGB].transposed()
@@ -64,14 +64,14 @@ static qreal adobeRGBGamma = qreal(563.0 / 256.0); // ~ 2.2
 static qreal proPhotoGamma = qreal(1.8);
 
 //qreal srgbToLinear(qreal nonlinear)
-//{    
+//{
 //    return (nonlinear <= qreal(0.04045))
 //           ? (nonlinear / qreal(12.92))
 //           : (pow((nonlinear + qreal(0.055)/ qreal(1.055), sRGBGamma));
 //}
-  
+
 //qreal srgbToNonLinear(qreal linear)
-//{    
+//{
 //    return   (linear <= qreal(0.0031308))
 //           ? (qreal(12.92) * linear)
 //           : (qreal(1.055) * pow(linear, qreal(1.0)/ qreal(sRGBGamma)) - qreal(0.055));
@@ -80,15 +80,15 @@ static qreal proPhotoGamma = qreal(1.8);
 QGenericMatrix<1, 3, qreal> pow(QGenericMatrix<1, 3, qreal> values, qreal power)
 {
     const qreal raised[] = { qPow(values(0, 0), power),
-                             qPow(values(1, 0), power), 
+                             qPow(values(1, 0), power),
                              qPow(values(2, 0), power) };
-    return QGenericMatrix<1, 3, qreal>(raised); 
+    return QGenericMatrix<1, 3, qreal>(raised);
 }
 
 QGenericMatrix<1, 3, qreal> toLinearRGB(QGenericMatrix<1, 3, qreal> rgb, RgbColorSpace rgbColorSpace)
 {
     QGenericMatrix<1, 3, qreal> linear;
-    
+
     switch (rgbColorSpace) {
         case sRGB: {
         break;
@@ -747,11 +747,11 @@ class ChromaticityDiagram : public QGraphicsView
 public:
     ChromaticityDiagram() {
         setWindowTitle("Chromaticity Diagram");
-        
+
         // Chart range
         qreal xRange = 0.8;
         qreal yRange = 0.9;
-        
+
         // Create Graphics scene with chart for axes
         m_scene = new QGraphicsScene(this);
         setScene(m_scene);
@@ -770,14 +770,14 @@ public:
         axisX->setTickCount(9);
         axisX->setLabelFormat("%g");
         axisX->setTitleText("CIE x");
-        m_chart->setAxisX(axisX, series);        
+        m_chart->setAxisX(axisX, series);
 
         QValueAxis *axisY = new QValueAxis;
         axisY->setRange(0, yRange);
         axisY->setTickCount(10);
         axisY->setTitleText("CIE y");
         m_chart->setAxisY(axisY, series);
-        
+
         // Diagram background (monochromoatic light outline, color
         // gradient fill) is drawn on a QImage using QPainter, and
         // displayed on the scene using this pixmap item.
@@ -790,7 +790,7 @@ public:
         for (int i = 1; i < entries; i+=1) {
             path.lineTo(monochromatic_xy[i][0], monochromatic_xy[i][1]);
         }
-        
+
         // Update diagram background on plot area change.
         connect(m_chart, &QChart::plotAreaChanged, [this, pix, xRange, yRange, path](const QRectF &plotArea){
 
@@ -810,13 +810,13 @@ public:
                 p.scale(1, -1);
                 p.translate(0, -yRange);
 
-            
+
                 // Draw monochromatic light "horseshoe" shape
                 QPen cosmetic(QColor(50,50,50));
                 cosmetic.setWidth(2);
                 cosmetic.setCosmetic(true);
                 p.strokePath(path, cosmetic);
-            }            
+            }
 
             // Fill horseshoe interior with color
             int xypolotHeight = xypolot.height();
@@ -831,22 +831,22 @@ public:
                 for (int p = 0; p < scanLinePixels; ++p) {
                     QRgb* pixel = scanline + p;
                     bool signal = qBlue(*pixel) > 10;
-                    
+
                     // transition to inside on falling edge
                     if (!inside && online && !signal) {
                         begin = pixel;
                         inside = true;
                     }
-                    
+
                     // transition to outside on rising edge
                     if (inside && !online && signal) {
                         end = pixel;
                         break; // only fill once
                     }
-                    
+
                     online = signal;
                 }
-                
+
                 // Don't fill if there was no beginning or no end of area
                 if (begin == nullptr || end == nullptr)
                     continue;
@@ -859,12 +859,12 @@ public:
                     QGenericMatrix<1, 3, qreal> Yxy(data);
                     QGenericMatrix<1, 3, qreal> rgb = YxyToLinearRGB(Yxy, sRGB);
                     *pixel = qRgba(rgb(0, 0), rgb(1, 0), rgb(2, 0), 40);
-                   
+
                     // YxyToLinearRGB is broken, fake it!
                     *pixel = qRgba(x * 250, y * 250 , 2, 255);
                 }
             }
-            
+
             // Update pixmap item with image and postion
             pix->setPixmap(QPixmap::fromImage(xypolot));
             pix->setOpacity(0.6);
@@ -872,21 +872,21 @@ public:
             pix->setPos(itemPosition);
             xypolot = QImage();
         });
-        
-        
+
+
         setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-        
+
         setStyleSheet( "QGraphicsView { border-style: none; }" );
     }
-    
+
     void resizeEvent(QResizeEvent *ev) {
         m_chart->setGeometry(QRectF(QPointF(0,0), QSizeF(ev->size())));
         QGraphicsView::resizeEvent(ev);
     }
-    
-    
-    
+
+
+
 
 private:
     QGraphicsScene *m_scene;
@@ -900,20 +900,20 @@ public:
         setWindowTitle("Window Color Controller");
         Q_UNUSED(window);
     }
-    
+
 };
 
 class ColorViewer : public QWidget
 {
 public:
     ColorViewer() {
-    
+
     }
-    
-    
+
+
 private:
-    
-    
+
+
 };
 
 int main(int argc, char ** argv)
@@ -923,24 +923,24 @@ int main(int argc, char ** argv)
     printPrimaries();
     thereAndBackAgain();
     printMonochromatic();
-    
+
 //    return 0;
 
     QWindow window;
     window.setTitle("Test Window");
     window.resize(320, 200);
     window.show();
-    
+
     WindowColorController controller(&window);
     controller.resize(320, 600);
    // controller.show();
-    
+
     ChromaticityDiagram chromaticityDiagram;
     chromaticityDiagram.resize(500, 600);
     chromaticityDiagram.show();
-    
+
     return app.exec();
-    
+
 }
 
 // READing:
