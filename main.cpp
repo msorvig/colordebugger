@@ -2,6 +2,7 @@
 #include <QtGui>
 #include <QtWidgets>
 #include <QtCharts>
+#include <QtOpenGL>
 QT_CHARTS_USE_NAMESPACE // wat
 
 // RGB to XYZ and Yxy conversion. The conversion is dependent on
@@ -15,6 +16,13 @@ enum RgbColorSpace
     ColorSpaceCount
 };
 
+QString colorSpaceText[ColorSpaceCount] =
+{
+    QString("sRGB"),
+    QString("AdobeRGB"),
+    QString("ProPhotoRGB")
+};
+
 // RGB <-> XYZ
 // Matrices from http://www.brucelindbloom.com/index.html?Eqn_RGB_XYZ_Matrix.html
 
@@ -23,15 +31,30 @@ static qreal sRGBtoXYZData[] =
       0.2126729, 0.7151522, 0.0721750,
       0.0193339, 0.1191920, 0.9503041 };
 
+static qreal XYZtosRGBData[] =
+    {  3.2404542,  -1.5371385, -0.4985314,
+      -0.9692660,   1.8760108,  0.0415560,
+       0.0556434,  -0.2040259,  1.0572252 };
+
 static qreal adobeRGBtoXYZData[] =
     { 0.5767309, 0.1855540, 0.1881852,
       0.2973769, 0.6273491, 0.0752741,
       0.0270343, 0.0706872, 0.9911085 };
 
+static qreal XYZtoAdobeRGBData[] =
+    { 2.0413690, -0.5649464, -0.3446944,
+     -0.9692660,  1.8760108,  0.0415560,
+      0.0134474, -0.1183897,  1.0154096 };
+
 static qreal proPhotoXYZData[] =
      { 0.7976749, 0.1351917, 0.0313534,
        0.2880402, 0.7118741, 0.0000857,
        0.0000000, 0.0000000, 0.8252100 };
+
+static qreal XYZtoProPhotoData[] =
+     { 1.3459433, -0.2556075, -0.0511118,
+      -0.5445989,  1.5081673,  0.0205351,
+       0.0000000,  0.0000000,  1.2118128 };
 
 static QGenericMatrix<3, 3, qreal> rgbToXYZMatrices[ColorSpaceCount] =
 {
@@ -42,9 +65,9 @@ static QGenericMatrix<3, 3, qreal> rgbToXYZMatrices[ColorSpaceCount] =
 
 static QGenericMatrix<3, 3, qreal> XYZtoRGBMatrices[ColorSpaceCount] =
 {
-    rgbToXYZMatrices[sRGB].transposed(),
-    rgbToXYZMatrices[AdobeRGB].transposed(),
-    rgbToXYZMatrices[ProPhotoRGB].transposed()
+    QGenericMatrix<3, 3, qreal>(XYZtosRGBData),
+    QGenericMatrix<3, 3, qreal>(XYZtoAdobeRGBData),
+    QGenericMatrix<3, 3, qreal>(XYZtoProPhotoData)
 };
 
 QGenericMatrix<1, 3, qreal> LinearRGBtoXYZ(QGenericMatrix<1, 3, qreal> rgb, RgbColorSpace rgbColorSpace)
@@ -52,9 +75,9 @@ QGenericMatrix<1, 3, qreal> LinearRGBtoXYZ(QGenericMatrix<1, 3, qreal> rgb, RgbC
     return rgbToXYZMatrices[rgbColorSpace] * rgb;
 }
 
-QGenericMatrix<1, 3, qreal> XYZtoLinearRGB(QGenericMatrix<1, 3, qreal> xyz, RgbColorSpace rgbColorSpace)
+QGenericMatrix<1, 3, qreal> XYZtoLinearRGB(QGenericMatrix<1, 3, qreal> XYZ, RgbColorSpace rgbColorSpace)
 {
-    return XYZtoRGBMatrices[rgbColorSpace] * xyz;
+    return XYZtoRGBMatrices[rgbColorSpace] * XYZ;
 }
 
 // Gamma: linear <-> nonlinear RGB
@@ -62,6 +85,12 @@ QGenericMatrix<1, 3, qreal> XYZtoLinearRGB(QGenericMatrix<1, 3, qreal> xyz, RgbC
 static qreal sRGBGamma = qreal(2.4);
 static qreal adobeRGBGamma = qreal(563.0 / 256.0); // ~ 2.2
 static qreal proPhotoGamma = qreal(1.8);
+static qreal gammas[ColorSpaceCount] =
+{
+    sRGBGamma,
+    adobeRGBGamma,
+    proPhotoGamma
+};
 
 //qreal srgbToLinear(qreal nonlinear)
 //{
@@ -90,20 +119,12 @@ QGenericMatrix<1, 3, qreal> toLinearRGB(QGenericMatrix<1, 3, qreal> rgb, RgbColo
     QGenericMatrix<1, 3, qreal> linear;
 
     switch (rgbColorSpace) {
-        case sRGB: {
-        break;
-            linear = pow(rgb, qreal(1.0) / sRGBGamma);
-        }
-        case AdobeRGB:
-            linear = pow(rgb, qreal(1.0) / adobeRGBGamma);
-        break;
-        case ProPhotoRGB:
-            linear = pow(rgb, qreal(1.0) / proPhotoGamma);
-        break;
+        case sRGB: // ### handle special case
         default:
-            qDebug() << "unexpected this is";
+            linear = pow(rgb, qreal(1.0) / gammas[rgbColorSpace]);
         break;
     }
+
     return linear;
 }
 
@@ -112,18 +133,9 @@ QGenericMatrix<1, 3, qreal> toNonlinearRGB(QGenericMatrix<1, 3, qreal> rgb, RgbC
     QGenericMatrix<1, 3, qreal> nonlinear;
 
     switch (rgbColorSpace) {
-        case sRGB: {
-            nonlinear = pow(rgb, sRGBGamma);
-        break;
-        }
-        case AdobeRGB:
-            nonlinear = pow(rgb, adobeRGBGamma);
-        break;
-        case ProPhotoRGB:
-            nonlinear = pow(rgb, proPhotoGamma);
-        break;
+        case sRGB: // ### handle special case
         default:
-            qDebug() << "unexpected this is";
+            nonlinear = pow(rgb, gammas[rgbColorSpace]);
         break;
     }
     return nonlinear;
@@ -156,12 +168,13 @@ QGenericMatrix<1, 3, qreal> YxyToLinearRGB(QGenericMatrix<1, 3, qreal> Yxy, RgbC
     const qreal X = (Y / y) * x;
     const qreal Z = (Y / y) * (1 - x - y);
     const qreal XYZ[] = { X, Y, Z };
+
     return XYZtoLinearRGB(QGenericMatrix<1, 3, qreal>(XYZ), rgbColorSpace);
 }
 
 QGenericMatrix<1, 3, qreal> YxyToRGB(QGenericMatrix<1, 3, qreal> Yxy, RgbColorSpace rgbColorSpace)
 {
-    return toNonlinearRGB(XYZtoLinearRGB(Yxy, rgbColorSpace), rgbColorSpace);
+    return toNonlinearRGB(YxyToLinearRGB(Yxy, rgbColorSpace), rgbColorSpace);
 }
 
 // QColor convenience for RGB <-> Yxy
@@ -711,24 +724,24 @@ void printPrimaries()
 {
     qDebug() << "";
     qDebug() << "Red Primary";
-    QColor green(255, 0, 0);
-    qDebug() << "sRGB" << RGBtoYxy(green, sRGB);
-    qDebug() << "AdobeRGB" << RGBtoYxy(green, AdobeRGB);
-    qDebug() << "ProPhotoRGB" << RGBtoYxy(green, ProPhotoRGB);
+    QColor red(255, 0, 0);
+    qDebug() << "sRGB" << RGBtoYxy(red, sRGB);
+//    qDebug() << "AdobeRGB" << RGBtoYxy(red, AdobeRGB);
+//    qDebug() << "ProPhotoRGB" << RGBtoYxy(red, ProPhotoRGB);
 
     qDebug() << "";
     qDebug() << "Green Primary";
-    QColor red(0, 255, 0);
-    qDebug() << "sRGB" << RGBtoYxy(red, sRGB);
-    qDebug() << "AdobeRGB" << RGBtoYxy(red, AdobeRGB);
-    qDebug() << "ProPhotoRGB" << RGBtoYxy(red, ProPhotoRGB);
+    QColor green(0, 255, 0);
+    qDebug() << "sRGB" << RGBtoYxy(green, sRGB);
+//    qDebug() << "AdobeRGB" << RGBtoYxy(green, AdobeRGB);
+//    qDebug() << "ProPhotoRGB" << RGBtoYxy(green, ProPhotoRGB);
 
     qDebug() << "";
     qDebug() << "Blue Primary";
     QColor blue(0, 0, 255);
     qDebug() << "sRGB" << RGBtoYxy(blue, sRGB);
-    qDebug() << "AdobeRGB" << RGBtoYxy(blue, AdobeRGB);
-    qDebug() << "ProPhotoRGB" << RGBtoYxy(blue, ProPhotoRGB);
+//    qDebug() << "AdobeRGB" << RGBtoYxy(blue, AdobeRGB);
+//    qDebug() << "ProPhotoRGB" << RGBtoYxy(blue, ProPhotoRGB);
 }
 
 void printMonochromatic()
@@ -742,15 +755,185 @@ void thereAndBackAgain()
     qDebug() << "Also Gray" << YxyToRGBQColor(RGBtoYxy(gray, sRGB), sRGB);
 }
 
+// CIE xy coordinate to QGraphicsScene pos bounded by plotArea.
+QPointF xyToScenePos(QPointF xy, QRectF plotArea, QPointF plotRange)
+{
+    return QPointF(xy.x() / plotRange.x() * plotArea.width() + plotArea.left(),
+                  ((plotRange.y() - xy.y()) / plotRange.y()) * plotArea.height() + plotArea.top());
+}
+
+// A Color item which is rendered as a circle on the diagram
+class ChromaticityColorItem : public QGraphicsEllipseItem
+{
+public:
+    ChromaticityColorItem()
+    :QGraphicsEllipseItem()
+    {
+        setRect(-5, -5, 10, 10);
+        setOpacity(0.5);
+
+        QPen cosmetic(QColor(50,50,50));
+        cosmetic.setWidth(2);
+        cosmetic.setCosmetic(true);
+        setPen(cosmetic);
+
+        setBrush(QColor(Qt::gray));
+    }
+
+    // Set RGB color
+    void setColor(QColor color, RgbColorSpace colorSpace)
+    {
+        auto Yxy = RGBtoYxy(color, colorSpace);
+        setColor(Yxy(1, 0), Yxy(2, 0));
+
+        setRenderColor(color);
+    }
+
+    // Set xy color (CIE xyY)
+    void setColor(qreal x, qreal y)
+    {
+        m_xy = QPointF(x, y);
+        setScenePos();
+    }
+
+    void setPlotArea(QRectF plotArea, QPointF plotRange)
+    {
+        m_plotArea = plotArea;
+        m_plotRange = plotRange;
+        setScenePos();
+    }
+
+private:
+    void setRenderColor(QColor color)
+    {
+        setBrush(color);
+    }
+
+    void setScenePos()
+    {
+        if (m_xy.x() == -1 || m_plotArea.isEmpty())
+            return;
+
+        setPos(xyToScenePos(m_xy, m_plotArea, m_plotRange));
+    }
+
+    QPointF m_xy;
+    QRectF m_plotArea;
+    QPointF m_plotRange;
+};
+
+// A Color Profile item which is rendered as a triangle on the diagram
+class ChromaticityColorProfileItem
+{
+public:
+    ChromaticityColorProfileItem()
+    {
+        for (int i = 0; i < 3; ++i) {
+            QGraphicsLineItem *lineItem = new QGraphicsLineItem();
+            QPen cosmetic(QColor(20,20,20));
+            cosmetic.setWidth(1.5);
+            cosmetic.setCosmetic(true);
+            lineItem->setPen(cosmetic);
+            m_lineItems.append(lineItem);
+        }
+
+        m_titleItem = new QGraphicsSimpleTextItem();
+        QFont font;
+        font.setPointSize(10);
+        m_titleItem->setFont(font);
+        m_titleItem->setBrush(QColor(20, 20, 20));
+        m_titleItem->setText("sRGB");
+    }
+
+    ~ChromaticityColorProfileItem()
+    {
+        qDeleteAll(m_lineItems);
+        m_lineItems.clear();
+    }
+
+    // Set RGB color
+    void setColorSpace(RgbColorSpace colorSpace)
+    {
+        if (m_titleItem)
+            m_titleItem->setText(colorSpaceText[colorSpace]);
+
+        // Get primaries
+        auto red   = RGBtoYxy(QColor(Qt::red), colorSpace);
+        auto green = RGBtoYxy(QColor(Qt::green), colorSpace);
+        auto blue  = RGBtoYxy(QColor(Qt::blue), colorSpace);
+
+        // Set xy positions
+        m_xy[0] = QPointF(red(1, 0), red(2, 0));
+        m_xy[1] = QPointF(green(1, 0), green(2, 0));
+        m_xy[2] = QPointF(blue(1, 0), blue(2, 0));
+
+        setScenePos();
+    }
+
+    void setPlotArea(QRectF plotArea, QPointF plotRange)
+    {
+        m_plotArea = plotArea;
+        m_plotRange = plotRange;
+        setScenePos();
+    }
+
+    void addItems(QGraphicsScene *scene)
+    {
+        m_scene = scene;
+        for (auto item : m_lineItems)
+            m_scene->addItem(item);
+        if (m_titleItem)
+            m_scene->addItem(m_titleItem);
+    }
+
+    void removeItems()
+    {
+        if (m_scene == nullptr)
+            return;
+        for (auto item : m_lineItems)
+            m_scene->removeItem(item);
+        if (m_titleItem)
+            m_scene->removeItem(m_titleItem);
+    }
+
+private:
+    void setScenePos()
+    {
+        if (m_plotArea.isEmpty())
+            return;
+
+        // Create gamut triangle
+        m_lineItems[0]->setLine(QLineF(xyToScenePos(m_xy[0], m_plotArea, m_plotRange), xyToScenePos(m_xy[1], m_plotArea, m_plotRange)));
+        m_lineItems[1]->setLine(QLineF(xyToScenePos(m_xy[1], m_plotArea, m_plotRange), xyToScenePos(m_xy[2], m_plotArea, m_plotRange)));
+        m_lineItems[2]->setLine(QLineF(xyToScenePos(m_xy[2], m_plotArea, m_plotRange), xyToScenePos(m_xy[0], m_plotArea, m_plotRange)));
+
+        // Label gamut triangle
+        if (m_titleItem) {
+            QPointF aboveGreen(xyToScenePos(m_xy[1], m_plotArea, m_plotRange) + QPointF(-15, -15));
+            m_titleItem->setPos(aboveGreen);
+        }
+    }
+
+    QPointF m_xy[3];
+    QRectF m_plotArea;
+    QPointF m_plotRange;
+    QList<QGraphicsLineItem *>m_lineItems;
+    QGraphicsSimpleTextItem *m_titleItem;
+    QGraphicsScene *m_scene = nullptr;
+};
+
+
 class ChromaticityDiagram : public QGraphicsView
 {
+private:
+    QPointF m_plotRangeMinimum = QPointF(0.8, 0.9);;
+    QPointF m_plotRange = m_plotRangeMinimum;
+    QValueAxis *m_axisX;
+    QValueAxis *m_axisY;
+
 public:
     ChromaticityDiagram() {
         setWindowTitle("Chromaticity Diagram");
-
-        // Chart range
-        qreal xRange = 0.8;
-        qreal yRange = 0.9;
 
         // Create Graphics scene with chart for axes
         m_scene = new QGraphicsScene(this);
@@ -765,18 +948,19 @@ public:
         QLineSeries *series = new QLineSeries();
         m_chart->addSeries(series);
 
-        QValueAxis *axisX = new QValueAxis;
-        axisX->setRange(0, xRange);
-        axisX->setTickCount(9);
-        axisX->setLabelFormat("%g");
-        axisX->setTitleText("CIE x");
-        m_chart->setAxisX(axisX, series);
+        m_axisX = new QValueAxis;
+        m_axisX->setRange(0, m_plotRange.x());
+        m_axisX->setTickCount(9);
+        m_axisX->setLabelFormat("%g");
+        m_axisX->setTitleText("CIE x");
+        m_chart->setAxisX(m_axisX, series);
 
-        QValueAxis *axisY = new QValueAxis;
-        axisY->setRange(0, yRange);
-        axisY->setTickCount(10);
-        axisY->setTitleText("CIE y");
-        m_chart->setAxisY(axisY, series);
+        m_axisY = new QValueAxis;
+        m_axisY->setRange(0, m_plotRange.y());
+        m_axisY->setTickCount(10);
+        m_axisX->setLabelFormat("%g");
+        m_axisY->setTitleText("CIE y");
+        m_chart->setAxisY(m_axisY, series);
 
         // Diagram background (monochromoatic light outline, color
         // gradient fill) is drawn on a QImage using QPainter, and
@@ -792,7 +976,7 @@ public:
         }
 
         // Update diagram background on plot area change.
-        connect(m_chart, &QChart::plotAreaChanged, [this, pix, xRange, yRange, path](const QRectF &plotArea){
+        connect(m_chart, &QChart::plotAreaChanged, [this, pix, path](const QRectF &plotArea){
 
             // Create cache image for drawing the xy plot, filled with transparent pixels
             QSize imageSize = plotArea.size().toSize();
@@ -802,16 +986,16 @@ public:
             xypolot.fill(QColor(0, 0, 0, 0));
 
             // Create painter, scaled to have a logical coordinate system in the
-            // 0..xRange/yRange, with the origin at the bottom right.
+            // 0..m_plotRange.x()/m_plotRange.y(), with the origin at the bottom right.
             {
                 QPainter p(&xypolot);
                 p.setRenderHint(QPainter::Antialiasing, true);
-                p.scale(imageSize.width() / xRange, imageSize.height() / yRange);
+                p.scale(imageSize.width() / m_plotRange.x(), imageSize.height() / m_plotRange.y());
                 p.scale(1, -1);
-                p.translate(0, -yRange);
+                p.translate(0, -m_plotRange.y());
 
 
-                // Draw monochromatic light "horseshoe" shape
+                // Draw monochromatic light "horseshoe" outline
                 QPen cosmetic(QColor(50,50,50));
                 cosmetic.setWidth(2);
                 cosmetic.setCosmetic(true);
@@ -828,6 +1012,7 @@ public:
                 bool online = false;
                 QRgb* begin = nullptr;
                 QRgb* end = nullptr;
+
                 for (int p = 0; p < scanLinePixels; ++p) {
                     QRgb* pixel = scanline + p;
                     bool signal = qBlue(*pixel) > 10;
@@ -853,12 +1038,13 @@ public:
 
                 for (QRgb *pixel = begin; pixel <= end; ++pixel) {
                     qreal Y = 1;
-                    qreal x = xRange * (qreal(pixel - scanline) / scanLinePixels);
-                    qreal y = yRange * (qreal(1.0) - (qreal(l) / xypolot.height()));
+                    qreal x = m_plotRange.x() * (qreal(pixel - scanline) / scanLinePixels);
+                    qreal y = m_plotRange.y() * (qreal(1.0) - (qreal(l) / xypolot.height()));
+
                     qreal data[] = {Y, x, y};
                     QGenericMatrix<1, 3, qreal> Yxy(data);
-                    QGenericMatrix<1, 3, qreal> rgb = YxyToLinearRGB(Yxy, sRGB);
-                    *pixel = qRgba(rgb(0, 0), rgb(1, 0), rgb(2, 0), 40);
+                    QGenericMatrix<1, 3, qreal> rgb = YxyToRGB(Yxy, sRGB);
+                    *pixel = qRgba(rgb(0, 0), rgb(1, 0), rgb(2, 0), 255);
 
                     // YxyToLinearRGB is broken, fake it!
                     *pixel = qRgba(x * 250, y * 250 , 2, 255);
@@ -874,10 +1060,57 @@ public:
         });
 
 
+        // Update color item positions on resize
+        connect(m_chart, &QChart::plotAreaChanged, [this](const QRectF &plotArea){
+            for (ChromaticityColorItem *item : m_colorItems)
+                item->setPlotArea(plotArea, m_plotRange);
+            for (ChromaticityColorProfileItem *item : m_colorProfileItems)
+                item->setPlotArea(plotArea, m_plotRange);
+        });
+
+
         setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-
         setStyleSheet( "QGraphicsView { border-style: none; }" );
+        setRenderHints(QPainter::Antialiasing);
+
+        grabGesture(Qt::PinchGesture);
+
+//        QGLWidget *viewPort = new QGLWidget(QGLFormat(QGL::SampleBuffers | QGL::AlphaChannel));
+//        setViewport(viewPort);
+    }
+
+    void setPlotRange(QPointF plotRange) {
+        // Zooming in breaks the color shading alogrithm, prevent it
+        if (plotRange.x() < m_plotRangeMinimum.x())
+            plotRange = m_plotRangeMinimum;
+
+        m_plotRange = plotRange;
+        m_axisX->setRange(0, m_plotRange.x());
+        m_axisY->setRange(0, m_plotRange.y());
+        m_scene->update(this->sceneRect());
+    }
+
+    bool event(QEvent *event)
+    {
+        if (event->type() == QEvent::Gesture)
+            return gestureEvent(static_cast<QGestureEvent*>(event));
+        return QGraphicsView::event(event);
+    }
+
+    bool gestureEvent(QGestureEvent *event) {
+        if (QGesture *pinch = event->gesture(Qt::PinchGesture))
+            return pinchGestureEvent(static_cast<QPinchGesture *>(pinch));
+
+        return false;
+    }
+
+    bool pinchGestureEvent(QPinchGesture *gesture) {
+        QPinchGesture::ChangeFlags changeFlags = gesture->changeFlags();
+        if (changeFlags & QPinchGesture::ScaleFactorChanged) {
+            setPlotRange(m_plotRange * 1.0f / gesture->scaleFactor());
+        }
+        return true;
     }
 
     void resizeEvent(QResizeEvent *ev) {
@@ -886,20 +1119,117 @@ public:
     }
 
 
+    void addColorItem(ChromaticityColorItem *colorItem) {
+        m_scene->addItem(colorItem);
+        colorItem->setPlotArea(m_chart->plotArea(), m_plotRange);
+        m_colorItems.append(colorItem);
+    }
 
+    void clearColorItems()
+    {
+       for (ChromaticityColorItem *item : m_colorItems)
+           m_scene->removeItem(item);
+       qDeleteAll(m_colorItems);
+       m_colorItems.clear();
+    }
+
+    void addColorProfileItem(ChromaticityColorProfileItem *colorProfileItem)
+    {
+        colorProfileItem->addItems(m_scene);
+        colorProfileItem->setPlotArea(m_chart->plotArea(), m_plotRange);
+        m_colorProfileItems.append(colorProfileItem);
+    }
 
 private:
     QGraphicsScene *m_scene;
     QChart *m_chart;
+    QList<ChromaticityColorItem *> m_colorItems;
+    QList<ChromaticityColorProfileItem *> m_colorProfileItems;
 };
+
+class TestWindow : public QRasterWindow
+{
+public:
+    TestWindow() {
+
+
+    }
+
+    QColor sample(QPoint position) {
+        return m_image.pixelColor(position);
+    }
+
+    void paintEvent(QPaintEvent *ev) {
+        QRect rect = QRect(QPoint(0, 0), size());
+
+        // Render to indirect image to get readPixel access.
+        if (m_image.size() != size()) {
+            qreal dpr = devicePixelRatio();
+            m_image = QImage(size() * dpr, QImage::Format_ARGB32_Premultiplied);
+//            m_image.setDevicePixelRatio(dpr);
+
+            QPainter p(&m_image);
+            QLinearGradient gradient(rect.topLeft(), rect.bottomRight());
+
+            gradient.setColorAt(0.1, Qt::green);
+            gradient.setColorAt(0.5, Qt::blue);
+            gradient.setColorAt(0.9, Qt::red);
+
+
+            p.fillRect(rect, gradient);
+        }
+
+        QPainter p(this);
+        p.fillRect(rect, m_image);
+
+    }
+private:
+    QImage m_image;
+};
+
 
 class WindowColorController : public QWidget
 {
 public:
-    WindowColorController(QWindow *window) {
-        setWindowTitle("Window Color Controller");
-        Q_UNUSED(window);
+    WindowColorController(TestWindow *testWindow, ChromaticityDiagram *chromaticityDiagram) {
+        setWindowTitle("Controller");
+
+        m_testWindow = testWindow;
+        m_chromaticityDiagram = chromaticityDiagram;
+
+        m_testWindow->installEventFilter(this);
     }
+
+    bool eventFilter(QObject *object, QEvent *ev)
+    {
+        // Filter for Mouse Move events.
+        if (ev->type() != QEvent::MouseMove)
+            return false;
+
+        QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(ev);
+        //qDebug() << "mouse move" << mouseEvent->localPos();
+
+        QPoint pos = mouseEvent->localPos().toPoint();
+        if (pos.x() < 0 || pos.y() < 0)
+            return false;
+
+        // Create Color item on the diagram that is going to track the mouse cursor
+        if (!m_item) {
+            m_item = new ChromaticityColorItem();
+            m_chromaticityDiagram->addColorItem(m_item);
+        }
+
+        // Sample test window at cursor position.
+        QColor color = m_testWindow->sample(pos);
+        m_item->setColor(color, sRGB);
+
+        return false;
+    }
+
+private:
+    TestWindow *m_testWindow;
+    ChromaticityDiagram *m_chromaticityDiagram;
+    ChromaticityColorItem *m_item = nullptr;
 
 };
 
@@ -920,24 +1250,44 @@ int main(int argc, char ** argv)
 {
     QApplication app(argc, argv);
 
-    printPrimaries();
+ //   printPrimaries();
     thereAndBackAgain();
-    printMonochromatic();
+ //   printMonochromatic();
 
-//    return 0;
-
-    QWindow window;
+    TestWindow window;
     window.setTitle("Test Window");
     window.resize(320, 200);
     window.show();
 
-    WindowColorController controller(&window);
-    controller.resize(320, 600);
-   // controller.show();
-
     ChromaticityDiagram chromaticityDiagram;
     chromaticityDiagram.resize(500, 600);
+
+    {
+        ChromaticityColorProfileItem *item = new ChromaticityColorProfileItem();
+        item->setColorSpace(sRGB);
+        chromaticityDiagram.addColorProfileItem(item);
+    }
+
+    {
+        ChromaticityColorProfileItem *item = new ChromaticityColorProfileItem();
+        item->setColorSpace(ProPhotoRGB);
+        chromaticityDiagram.addColorProfileItem(item);
+    }
+
+
+    WindowColorController controller(&window, &chromaticityDiagram);
+    controller.resize(320, 600);
+    controller.show();
+
+
     chromaticityDiagram.show();
+
+    window.raise();
+    window.setGeometry(100, 100, 300, 300);
+
+    chromaticityDiagram.setGeometry(600, 100, 500, 600);
+
+    controller.setGeometry(100, 500, 300, 300);
 
     return app.exec();
 
