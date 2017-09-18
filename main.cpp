@@ -11,6 +11,7 @@ QT_CHARTS_USE_NAMESPACE // wat
 enum RgbColorSpace
 {
     sRGB,
+    sRGBLinear,
     AdobeRGB,
     ProPhotoRGB,
     ColorSpaceCount
@@ -19,6 +20,7 @@ enum RgbColorSpace
 QString colorSpaceText[ColorSpaceCount] =
 {
     QString("sRGB"),
+    QString("sRGBLinear"),
     QString("AdobeRGB"),
     QString("ProPhotoRGB")
 };
@@ -59,12 +61,14 @@ static qreal XYZtoProPhotoData[] =
 static QGenericMatrix<3, 3, qreal> rgbToXYZMatrices[ColorSpaceCount] =
 {
     QGenericMatrix<3, 3, qreal>(sRGBtoXYZData),
+    QGenericMatrix<3, 3, qreal>(sRGBtoXYZData),
     QGenericMatrix<3, 3, qreal>(adobeRGBtoXYZData),
     QGenericMatrix<3, 3, qreal>(proPhotoXYZData)
 };
 
 static QGenericMatrix<3, 3, qreal> XYZtoRGBMatrices[ColorSpaceCount] =
 {
+    QGenericMatrix<3, 3, qreal>(XYZtosRGBData),
     QGenericMatrix<3, 3, qreal>(XYZtosRGBData),
     QGenericMatrix<3, 3, qreal>(XYZtoAdobeRGBData),
     QGenericMatrix<3, 3, qreal>(XYZtoProPhotoData)
@@ -118,8 +122,12 @@ QGenericMatrix<1, 3, qreal> toLinearRGB(QGenericMatrix<1, 3, qreal> rgb, RgbColo
 {
     QGenericMatrix<1, 3, qreal> linear;
 
+
     switch (rgbColorSpace) {
-        case sRGB: // ### handle special case
+        case sRGBLinear:
+            linear = rgb;
+        break;
+        case sRGB: // ### TODO handle special case
         default:
             linear = pow(rgb, qreal(1.0) / gammas[rgbColorSpace]);
         break;
@@ -133,7 +141,10 @@ QGenericMatrix<1, 3, qreal> toNonlinearRGB(QGenericMatrix<1, 3, qreal> rgb, RgbC
     QGenericMatrix<1, 3, qreal> nonlinear;
 
     switch (rgbColorSpace) {
-        case sRGB: // ### handle special case
+        case sRGBLinear:
+            nonlinear = rgb;
+        break;
+        case sRGB: // ### TODO handle special case
         default:
             nonlinear = pow(rgb, gammas[rgbColorSpace]);
         break;
@@ -143,9 +154,8 @@ QGenericMatrix<1, 3, qreal> toNonlinearRGB(QGenericMatrix<1, 3, qreal> rgb, RgbC
 
 // RGB <-> Yxy: TODO: make this xyY
 
-QGenericMatrix<1, 3, qreal> LinearRGBtoYxy(QGenericMatrix<1, 3, qreal> rgb, RgbColorSpace rgbColorSpace)
+QGenericMatrix<1, 3, qreal> XYZtoYxy(QGenericMatrix<1, 3, qreal> XYZ)
 {
-    const QGenericMatrix<1, 3, qreal> XYZ = LinearRGBtoXYZ(rgb, rgbColorSpace);
     const qreal sum = XYZ(0, 0) + XYZ(1, 0) + XYZ(2, 0);
     const qreal Yxy[] = {
         XYZ(1, 0),
@@ -155,12 +165,17 @@ QGenericMatrix<1, 3, qreal> LinearRGBtoYxy(QGenericMatrix<1, 3, qreal> rgb, RgbC
     return QGenericMatrix<1, 3, qreal>(Yxy);
 }
 
+QGenericMatrix<1, 3, qreal> LinearRGBtoYxy(QGenericMatrix<1, 3, qreal> rgb, RgbColorSpace rgbColorSpace)
+{
+    return XYZtoYxy(LinearRGBtoXYZ(rgb, rgbColorSpace));
+}
+
 QGenericMatrix<1, 3, qreal> RGBtoYxy(QGenericMatrix<1, 3, qreal> rgb, RgbColorSpace rgbColorSpace)
 {
     return LinearRGBtoYxy(toLinearRGB(rgb, rgbColorSpace), rgbColorSpace);
 }
 
-QGenericMatrix<1, 3, qreal> YxyToLinearRGB(QGenericMatrix<1, 3, qreal> Yxy, RgbColorSpace rgbColorSpace)
+QGenericMatrix<1, 3, qreal> YxyToXYZ(QGenericMatrix<1, 3, qreal> Yxy)
 {
     const qreal Y = Yxy(0,0);
     const qreal x = Yxy(1,0);
@@ -168,8 +183,12 @@ QGenericMatrix<1, 3, qreal> YxyToLinearRGB(QGenericMatrix<1, 3, qreal> Yxy, RgbC
     const qreal X = (Y / y) * x;
     const qreal Z = (Y / y) * (1 - x - y);
     const qreal XYZ[] = { X, Y, Z };
+    return QGenericMatrix<1, 3, qreal>(XYZ);
+}
 
-    return XYZtoLinearRGB(QGenericMatrix<1, 3, qreal>(XYZ), rgbColorSpace);
+QGenericMatrix<1, 3, qreal> YxyToLinearRGB(QGenericMatrix<1, 3, qreal> Yxy, RgbColorSpace rgbColorSpace)
+{
+    return XYZtoLinearRGB(YxyToXYZ(Yxy), rgbColorSpace);
 }
 
 QGenericMatrix<1, 3, qreal> YxyToRGB(QGenericMatrix<1, 3, qreal> Yxy, RgbColorSpace rgbColorSpace)
@@ -179,16 +198,32 @@ QGenericMatrix<1, 3, qreal> YxyToRGB(QGenericMatrix<1, 3, qreal> Yxy, RgbColorSp
 
 // QColor convenience for RGB <-> Yxy
 
-QGenericMatrix<1, 3, qreal> RGBtoYxy(QColor rgb, RgbColorSpace rgbColorSpace)
+qreal clamp(qreal val, qreal min, qreal max)
+{
+    return qMax(qMin(val, max), min);
+}
+
+QGenericMatrix<1, 3, qreal> toVector(QColor rgb)
 {
     const qreal rgbReal[3] = { rgb.redF(), rgb.greenF(), rgb.blueF() };
-    return RGBtoYxy(QGenericMatrix<1, 3, qreal>(rgbReal), rgbColorSpace);
+    return QGenericMatrix<1, 3, qreal>(rgbReal);
+}
+
+QColor toColor(QGenericMatrix<1, 3, qreal> rgb)
+{
+    return QColor(clamp(rgb(0, 0), 0, 1) * 255.0,
+                  clamp(rgb(1, 0), 0, 1) * 255.0,
+                  clamp(rgb(2, 0), 0, 1) * 255.0);
+}
+
+QGenericMatrix<1, 3, qreal> RGBtoYxy(QColor rgb, RgbColorSpace rgbColorSpace)
+{
+    return RGBtoYxy(toVector(rgb), rgbColorSpace);
 }
 
 QColor YxyToRGBQColor(QGenericMatrix<1, 3, qreal> Yxy, RgbColorSpace rgbColorSpace)
 {
-    QGenericMatrix<1, 3, qreal> rgb = YxyToRGB(Yxy, rgbColorSpace);
-    return QColor(rgb(0, 0) * 255.0, rgb(1, 0) * 255.0, rgb(2, 0) * 255.0);
+    return toColor(YxyToRGB(Yxy, rgbColorSpace));
 }
 
 // Data generated from monochromatic_xy.py
@@ -753,6 +788,30 @@ void thereAndBackAgain()
     QColor gray(140, 140, 140);
     qDebug() << "     Gray" << gray;
     qDebug() << "Also Gray" << YxyToRGBQColor(RGBtoYxy(gray, sRGB), sRGB);
+
+    //QColor blue(0.2 * 255, 0.3 * 255, 0.9 * 255);
+    QColor blue(0, 0, 255);
+    qDebug() << "     Blue" << blue;
+
+    auto XYZ = LinearRGBtoXYZ(toVector(blue), sRGB);
+    auto RGB = XYZtoLinearRGB(XYZ, sRGB);
+
+    qDebug() << "XYZ" << XYZ;
+    qDebug() << "RGB" << toColor(RGB);
+
+    auto Yxy = XYZtoYxy(XYZ);
+    qDebug() << "Yxy" << Yxy;
+    auto XYZ2 = YxyToXYZ(Yxy);
+    qDebug() << "YYZ 2" << XYZ2;
+
+    qDebug() << "RGB 2" << XYZtoLinearRGB(XYZ, sRGB);
+    qDebug() << "RGB 3" << XYZtoLinearRGB(YxyToXYZ(Yxy), sRGB);
+    qDebug() << "RGB 4" << YxyToLinearRGB(Yxy, sRGB);
+
+//    auto Yxy = LinearRGBtoYxy(toVector(blue), sRGB);
+
+
+    qDebug() << "Also Blue" << YxyToRGBQColor(Yxy, sRGB);
 }
 
 // CIE xy coordinate to QGraphicsScene pos bounded by plotArea.
@@ -985,15 +1044,14 @@ public:
             xypolot.setDevicePixelRatio(dpr);
             xypolot.fill(QColor(0, 0, 0, 0));
 
-            // Create painter, scaled to have a logical coordinate system in the
-            // 0..m_plotRange.x()/m_plotRange.y(), with the origin at the bottom right.
             {
+                // Create painter, scaled to have a logical coordinate system in the
+                // 0..m_plotRange.x()/m_plotRange.y(), with the origin at the bottom right.
                 QPainter p(&xypolot);
                 p.setRenderHint(QPainter::Antialiasing, true);
                 p.scale(imageSize.width() / m_plotRange.x(), imageSize.height() / m_plotRange.y());
                 p.scale(1, -1);
                 p.translate(0, -m_plotRange.y());
-
 
                 // Draw monochromatic light "horseshoe" outline
                 QPen cosmetic(QColor(50,50,50));
@@ -1036,24 +1094,21 @@ public:
                 if (begin == nullptr || end == nullptr)
                     continue;
 
+                // Fill line with RGB color corresponding to the CIE x,y coordinate
+                qreal CIE_y = m_plotRange.y() * ((qreal(xypolotHeight) - qreal(l)) / qreal(xypolotHeight));
                 for (QRgb *pixel = begin; pixel <= end; ++pixel) {
-                    qreal Y = 1;
-                    qreal x = m_plotRange.x() * (qreal(pixel - scanline) / scanLinePixels);
-                    qreal y = m_plotRange.y() * (qreal(1.0) - (qreal(l) / xypolot.height()));
-
-                    qreal data[] = {Y, x, y};
+                    qreal CIE_Y = 1;
+                    qreal CIE_x = m_plotRange.x() * qreal(pixel - scanline) / xypolot.width();
+                    qreal data[] = { CIE_Y, CIE_x, CIE_y };
                     QGenericMatrix<1, 3, qreal> Yxy(data);
-                    QGenericMatrix<1, 3, qreal> rgb = YxyToRGB(Yxy, sRGB);
-                    *pixel = qRgba(rgb(0, 0), rgb(1, 0), rgb(2, 0), 255);
-
-                    // YxyToLinearRGB is broken, fake it!
-                    *pixel = qRgba(x * 250, y * 250 , 2, 255);
+                    QColor color = toColor(YxyToLinearRGB(Yxy, ProPhotoRGB));
+                    *pixel = color.rgba();
                 }
             }
 
             // Update pixmap item with image and postion
             pix->setPixmap(QPixmap::fromImage(xypolot));
-            pix->setOpacity(0.6);
+            pix->setOpacity(0.8);
             QPointF itemPosition = plotArea.topLeft();
             pix->setPos(itemPosition);
             xypolot = QImage();
@@ -1074,6 +1129,7 @@ public:
         setStyleSheet( "QGraphicsView { border-style: none; }" );
         setRenderHints(QPainter::Antialiasing);
 
+        // Enable zoom on pinch
         grabGesture(Qt::PinchGesture);
 
 //        QGLWidget *viewPort = new QGLWidget(QGLFormat(QGL::SampleBuffers | QGL::AlphaChannel));
@@ -1172,8 +1228,9 @@ public:
             QLinearGradient gradient(rect.topLeft(), rect.bottomRight());
 
             gradient.setColorAt(0.1, Qt::green);
-            gradient.setColorAt(0.5, Qt::blue);
-            gradient.setColorAt(0.9, Qt::red);
+            gradient.setColorAt(0.3, Qt::blue);
+            gradient.setColorAt(0.6, Qt::red);
+            gradient.setColorAt(0.9, Qt::green);
 
 
             p.fillRect(rect, gradient);
@@ -1221,7 +1278,7 @@ public:
 
         // Sample test window at cursor position.
         QColor color = m_testWindow->sample(pos);
-        m_item->setColor(color, sRGB);
+        m_item->setColor(color, sRGBLinear);
 
         return false;
     }
@@ -1251,16 +1308,15 @@ int main(int argc, char ** argv)
     QApplication app(argc, argv);
 
  //   printPrimaries();
-    thereAndBackAgain();
+//    thereAndBackAgain();
  //   printMonochromatic();
 
-    TestWindow window;
-    window.setTitle("Test Window");
-    window.resize(320, 200);
-    window.show();
+ // return 0;
+
+    TestWindow testWindow;
+    testWindow.setTitle("Test Window");
 
     ChromaticityDiagram chromaticityDiagram;
-    chromaticityDiagram.resize(500, 600);
 
     {
         ChromaticityColorProfileItem *item = new ChromaticityColorProfileItem();
@@ -1274,20 +1330,21 @@ int main(int argc, char ** argv)
         chromaticityDiagram.addColorProfileItem(item);
     }
 
+    WindowColorController controller(&testWindow, &chromaticityDiagram);
 
-    WindowColorController controller(&window, &chromaticityDiagram);
-    controller.resize(320, 600);
-    controller.show();
+    // Show all windows
 
-
-    chromaticityDiagram.show();
-
-    window.raise();
-    window.setGeometry(100, 100, 300, 300);
+    testWindow.setGeometry(100, 100, 300, 300);
+    testWindow.raise();
+    testWindow.show();
 
     chromaticityDiagram.setGeometry(600, 100, 500, 600);
+    chromaticityDiagram.raise();
+    chromaticityDiagram.show();
 
     controller.setGeometry(100, 500, 300, 300);
+    controller.raise();
+    controller.show();
 
     return app.exec();
 
