@@ -1,6 +1,9 @@
 import ciexyz
 import colormodels
 
+# This script prints CIE xy coordinates for the monochromatic "rainbow" colors as a C++ array.
+
+# Wavelenghts: begin, end and increment.
 begin_wl = 360 # hardcoded in get_normalized_spectral_line_colors
 end_wl = 830
 delta_wl = 20
@@ -13,7 +16,7 @@ for i in xrange (0, num_colors):
 
 entries = len(xy_list)
 
-# print Qt array
+# print array
 print "int begin_wl = {begin_wl};".format(begin_wl=begin_wl)
 print "int end_wl = {end_wl};".format(end_wl=end_wl)
 print "int delta_wl = {delta_wl};".format(delta_wl=delta_wl)
