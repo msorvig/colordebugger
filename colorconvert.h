@@ -4,40 +4,57 @@
 #include <QtCore>
 #include <QtGui>
 
+
 // RGB to XYZ and Yxy conversion. The conversion is dependent on
 // which RGB color space is in use. This file implements support
 // for a few popular RGB color spaces.
+
 enum RgbColorSpace
 {
     sRGB,
-    sRGBLinear,
     AdobeRGB,
     ProPhotoRGB,
+    AdobeWideGamutRGB,
+    Rec709,
+    Rec2020,
+    DCI_P3,
     ColorSpaceCount
 };
-
 QString colorSpaceName(RgbColorSpace colorSpace);
 
-QGenericMatrix<1, 3, qreal> LinearRGBtoXYZ(QGenericMatrix<1, 3, qreal> rgb, RgbColorSpace rgbColorSpace);
-QGenericMatrix<1, 3, qreal> XYZtoLinearRGB(QGenericMatrix<1, 3, qreal> XYZ, RgbColorSpace rgbColorSpace);
+// The RGBColorSpace represents a spesific RGB color space defined by the xy
+// coordinates for the red green and blue primaries, and a gamma value. Several
+// pre-defined colorspaces are also provided. (sRGB, AdobeRGB, ProPhotoRGB)
+// 
+// The class supports converting beween RGB and xyY colors.
+//
+// Implementation notes:
+//    - some color spaces (like sRGB) has picewise "gamma" functions. This
+//      class ignores this and uses a single gamma value.
+//    - the white point is hardcoded to D65 white. 
 
-// Gamma: linear <-> nonlinear RGB
-QGenericMatrix<1, 3, qreal> pow(QGenericMatrix<1, 3, qreal> values, qreal power);
-QGenericMatrix<1, 3, qreal> toLinearRGB(QGenericMatrix<1, 3, qreal> rgb, RgbColorSpace rgbColorSpace);
-QGenericMatrix<1, 3, qreal> toNonlinearRGB(QGenericMatrix<1, 3, qreal> rgb, RgbColorSpace rgbColorSpace);
+class RGBColorSpace
+{
+public:
+    RGBColorSpace(RgbColorSpace rgbSpace, qreal gamma);
+    RGBColorSpace(qreal rxy[2], qreal gxy[2], qreal bxy[2],
+                  qreal gamma, const QString &name);
 
-// RGB <-> Yxy: TODO: make this xyY
-QGenericMatrix<1, 3, qreal> XYZtoYxy(QGenericMatrix<1, 3, qreal> XYZ);
-QGenericMatrix<1, 3, qreal> LinearRGBtoYxy(QGenericMatrix<1, 3, qreal> rgb, RgbColorSpace rgbColorSpace);
-QGenericMatrix<1, 3, qreal> RGBtoYxy(QGenericMatrix<1, 3, qreal> rgb, RgbColorSpace rgbColorSpace);
-QGenericMatrix<1, 3, qreal> YxyToXYZ(QGenericMatrix<1, 3, qreal> Yxy);
-QGenericMatrix<1, 3, qreal> YxyToLinearRGB(QGenericMatrix<1, 3, qreal> Yxy, RgbColorSpace rgbColorSpace);
-QGenericMatrix<1, 3, qreal> YxyToRGB(QGenericMatrix<1, 3, qreal> Yxy, RgbColorSpace rgbColorSpace);
+    QGenericMatrix<1, 3, qreal> convertRGBtoYxy(QColor rgb);
+    QColor convertYxyToRGB(QGenericMatrix<1, 3, qreal> Yxy);
 
-// QColor convenience for RGB <-> Yxy
-QGenericMatrix<1, 3, qreal> toVector(QColor rgb);
-QColor toColor(QGenericMatrix<1, 3, qreal> rgb);
-QGenericMatrix<1, 3, qreal> RGBtoYxy(QColor rgb, RgbColorSpace rgbColorSpace);
-QColor YxyToRGBQColor(QGenericMatrix<1, 3, qreal> Yxy, RgbColorSpace rgbColorSpace);
+    QGenericMatrix<3, 3, qreal> RGBtoXYZMatrix();
+    QGenericMatrix<3, 3, qreal> XYZtoRGBMatrix();
+    qreal gamma();
+    QString name();
+    
+    static QGenericMatrix<3, 3, qreal> createRGBtoRGBMatrix(const RGBColorSpace &source,
+                                                            const RGBColorSpace &destination);
+private:
+    qreal m_gamma;
+    QString m_name;
+    QGenericMatrix<3, 3, qreal> m_RGBtoXYZ;
+    QGenericMatrix<3, 3, qreal> m_XYZtoRGB;
+};
 
 #endif

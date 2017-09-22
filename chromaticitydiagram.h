@@ -53,7 +53,7 @@ class ChromaticityColorItem : public QGraphicsEllipseItem
 {
 public:
     ChromaticityColorItem();
-    void setColor(QColor color, RgbColorSpace colorSpace);
+    void setColor(QColor color, RGBColorSpace colorSpace);
     void setColor(qreal x, qreal y);
 
 
@@ -76,7 +76,8 @@ public:
     ChromaticityColorProfileItem();
     ~ChromaticityColorProfileItem();
 
-    void setColorSpace(RgbColorSpace colorSpace);
+    void setColorSpace(RGBColorSpace colorSpace);
+    void setVisible(bool visible);
 
 private:
     friend class ChromaticityDiagram;

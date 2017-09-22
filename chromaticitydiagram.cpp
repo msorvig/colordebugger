@@ -83,6 +83,9 @@ ChromaticityDiagram::ChromaticityDiagram() {
             cosmetic.setCosmetic(true);
             p.strokePath(path, cosmetic);
         }
+        
+        // A RGB color space that covers approxemately the entire chromaticity chart.
+        RGBColorSpace allColors( (qreal []){0.74, 0.25}, (qreal []){0.05, 0.85}, (qreal []){0.17, 0.0}, 1.0, "allColors");
 
         // Fill horseshoe interior with color
         int xypolotHeight = xypolot.height();
@@ -118,14 +121,13 @@ ChromaticityDiagram::ChromaticityDiagram() {
             if (begin == nullptr || end == nullptr)
                 continue;
 
-            // Fill line with RGB color corresponding to the CIE x,y coordinate
+            // Fill line with RGB color corresponding to the CIE xy coordinate
             qreal CIE_y = m_plotRange.y() * ((qreal(xypolotHeight) - qreal(l)) / qreal(xypolotHeight));
             for (QRgb *pixel = begin; pixel <= end; ++pixel) {
                 qreal CIE_Y = 1;
                 qreal CIE_x = m_plotRange.x() * qreal(pixel - scanline) / xypolot.width();
-                qreal data[] = { CIE_Y, CIE_x, CIE_y };
-                QGenericMatrix<1, 3, qreal> Yxy(data);
-                QColor color = toColor(YxyToLinearRGB(Yxy, ProPhotoRGB));
+                QGenericMatrix<1, 3, qreal> Yxy((qreal[]){ CIE_Y, CIE_x, CIE_y });
+                QColor color = allColors.convertYxyToRGB(Yxy);
                 *pixel = color.rgba();
             }
         }
@@ -232,16 +234,19 @@ ChromaticityColorItem::ChromaticityColorItem()
 }
 
 // Set RGB color
-void ChromaticityColorItem::setColor(QColor color, RgbColorSpace colorSpace)
+void ChromaticityColorItem::setColor(QColor color, RGBColorSpace colorSpace)
 {
     setVisible(color.isValid());
-    
     if (color.isValid() == false)
         return;
-        
-    auto Yxy = RGBtoYxy(color, colorSpace);
-    setColor(Yxy(1, 0), Yxy(2, 0));
 
+    auto Yxy = colorSpace.convertRGBtoYxy(color);
+    if (std::isnan(Yxy(1, 0)) || std::isnan(Yxy(2, 0))) {
+        setVisible(false);
+        return;
+    }
+
+    setColor(Yxy(1, 0), Yxy(2, 0));
     setRenderColor(color);
 }
 
@@ -272,7 +277,6 @@ void ChromaticityColorItem::setScenePos()
     setPos(xyToScenePos(m_xy, m_plotArea, m_plotRange));
 }
 
-
 ChromaticityColorProfileItem::ChromaticityColorProfileItem()
 {
     for (int i = 0; i < 3; ++i) {
@@ -296,17 +300,18 @@ ChromaticityColorProfileItem::~ChromaticityColorProfileItem()
 {
     qDeleteAll(m_lineItems);
     m_lineItems.clear();
+    delete m_titleItem;
 }
 
-void ChromaticityColorProfileItem::setColorSpace(RgbColorSpace colorSpace)
+void ChromaticityColorProfileItem::setColorSpace(RGBColorSpace colorSpace)
 {
     if (m_titleItem)
-        m_titleItem->setText(colorSpaceName(colorSpace));
+        m_titleItem->setText(colorSpace.name());
 
     // Get primaries
-    auto red   = RGBtoYxy(QColor(Qt::red), colorSpace);
-    auto green = RGBtoYxy(QColor(Qt::green), colorSpace);
-    auto blue  = RGBtoYxy(QColor(Qt::blue), colorSpace);
+    auto red   = colorSpace.convertRGBtoYxy(QColor(Qt::red));
+    auto green = colorSpace.convertRGBtoYxy(QColor(Qt::green));
+    auto blue  = colorSpace.convertRGBtoYxy(QColor(Qt::blue));
 
     // Set xy positions
     m_xy[0] = QPointF(red(1, 0), red(2, 0));
@@ -314,6 +319,14 @@ void ChromaticityColorProfileItem::setColorSpace(RgbColorSpace colorSpace)
     m_xy[2] = QPointF(blue(1, 0), blue(2, 0));
 
     setScenePos();
+}
+
+void ChromaticityColorProfileItem::setVisible(bool visible)
+{
+    for (auto item : m_lineItems)
+        item->setVisible(visible);
+    if (m_titleItem)
+        m_titleItem->setVisible(visible);
 }
 
 void ChromaticityColorProfileItem::setPlotArea(QRectF plotArea, QPointF plotRange)
