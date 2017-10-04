@@ -221,14 +221,24 @@ QGenericMatrix<1, 3, qreal> XYZtoLinearRGB(QGenericMatrix<1, 3, qreal> XYZ, RGBC
 
 // Gamma: linear <-> nonlinear RGB
 
-static qreal sRGBGamma = qreal(2.4);
+static qreal sRGBGamma = qreal(2.2); // ### ignoring sRGB complexities
 static qreal adobeRGBGamma = qreal(563.0 / 256.0); // ~ 2.2
+static qreal adobeWideGamutRGBGamma = qreal(563.0 / 256.0); // ~ 2.2
 static qreal proPhotoGamma = qreal(1.8);
+static qreal rec709Gamma = qreal(2.4);
+static qreal rec20202Gamma = qreal(2.4);
+static qreal dciP3Gamma = qreal(2.6);
+static qreal displayP3Gamma = qreal(2.2); // Apple Display P3: DCI p3 with sRGB gamma
+
 static qreal gammas[ColorSpaceCount] =
 {
     sRGBGamma,
     adobeRGBGamma,
-    proPhotoGamma
+    proPhotoGamma,
+    adobeWideGamutRGBGamma,
+    rec709Gamma,
+    rec20202Gamma,
+    dciP3Gamma
 };
 
 //qreal srgbToLinear(qreal nonlinear)
