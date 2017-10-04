@@ -142,7 +142,21 @@ public:
         layout->setAlignment(Qt::AlignTop);
         this->setLayout(layout);
 
-        // Create Sampler config UI
+        // Create test window configuration UI
+        layout->addWidget(new QLabel("Test Window Color Space"));
+        QComboBox *spaceSelector = new QComboBox();
+        layout->addWidget(spaceSelector);
+        for (int i = 0; i < ColorSpaceCount; ++i) {
+            spaceSelector->addItem(colorSpaceName(RgbColorSpace(i)));
+        }
+        auto activatedIntFn = static_cast<void(QComboBox::*)(int)>(&QComboBox::activated);
+        connect(spaceSelector, activatedIntFn, [this](int i) {
+            m_colorSpace = RGBColorSpace(RgbColorSpace(i), 1.0);
+        });
+
+        layout->addSpacing(10);
+
+        // Create sampler configuration UI
         layout->addWidget(new QLabel("Sampler"));
 
         QHBoxLayout *samplerConfigLayout = new QHBoxLayout;
@@ -170,12 +184,15 @@ public:
             m_sampleRadius = value;
         });
 
+        layout->addSpacing(10);
+
         // Define function that adds a color space selecor row
         m_addColorSelector = [this](QVBoxLayout *layout) {
-            // The row controls a color profile item on the diagram
-            ChromaticityColorProfileItem *item = new ChromaticityColorProfileItem();
-            m_chromaticityDiagram->addColorProfileItem(item);
-            bool *wasActivated = new bool(false);
+
+            // Each row controls a color profile item on the diagram
+            QSharedPointer<ChromaticityColorProfileItem> item(new ChromaticityColorProfileItem());
+            m_chromaticityDiagram->addColorProfileItem(item.data());
+            QSharedPointer<bool> wasActivated(new bool(false));
 
             // Create row lauyout
             QHBoxLayout *rowLayout = new QHBoxLayout();
@@ -189,19 +206,18 @@ public:
             for (int i = 0; i < ColorSpaceCount; ++i) {
                 spaceSelector->addItem(colorSpaceName(RgbColorSpace(i)));
             }
-#if 1
+
             // Add "remove" button
             QPushButton *remove = new QPushButton("X");
             remove->setVisible(false); // ### buggy, disable
             rowLayout->addWidget(remove);
             remove->setEnabled(false);
-            connect(remove, &QPushButton::clicked, [layout, item, wasActivated, rowLayout](bool checked){
+            connect(remove, &QPushButton::clicked, [layout, rowLayout](bool checked){
                 // Clean up: the layout owns the UI widgets
                 layout->removeItem(rowLayout);
                 rowLayout->deleteLater();
-                delete item;
             });
-#endif
+
             // Add checkbox that copntrols visiiblity.
             QCheckBox *visible = new QCheckBox("Visble");
             visible->setEnabled(false);
@@ -214,22 +230,27 @@ public:
             // Combox selection changed
             auto activatedIntFn = static_cast<void(QComboBox::*)(int)>(&QComboBox::activated);
             connect(spaceSelector, activatedIntFn, [this, item, layout, wasActivated, remove, visible](int i) {
-                if (i >= 1) {
-                    item->setColorSpace(RGBColorSpace(RgbColorSpace(i - 1), 1.0));
-                    if (*wasActivated == false) {
-                        *wasActivated = true;
-
-                        remove->setEnabled(true);
-                        visible->setEnabled(true);
-
-                        // Add "next" selector row
-                        this->m_addColorSelector(layout);
-                    }
+                if (i < 1) {
+                    item->setVisible(false);
+                    remove->setEnabled(false);
+                    visible->setEnabled(false);
+                    return;
                 }
+
+                item->setColorSpace(RGBColorSpace(RgbColorSpace(i - 1), 1.0));
+                item->setVisible(true);
+                remove->setEnabled(true);
+                visible->setEnabled(true);
+
+               if (*wasActivated)
+                    return;
+                *wasActivated = true;
+              // Enable this line and add next line
+               this->m_addColorSelector(layout);
             });
         };
         
-        layout->addWidget(new QLabel("Color Spaces"));
+        layout->addWidget(new QLabel("Diagram Color Spaces"));
         m_addColorSelector(layout);
     }
 
@@ -261,13 +282,14 @@ public:
         }
 
 
-        // first point: sample at pos.
+        // First point: sample at cursor position
         QColor color = m_testWindow->sample(pos);
         m_items.at(0)->setColor(color, m_colorSpace);
 
         // Sample test window at/around cursor position.
         for (int i = 1; i < m_colorItemCount; ++i) {
-            // square around pos
+
+            // Square around pos
             int edgeCount = sqrt(m_colorItemCount - 1);
             int offsetIndex = i - 1;
             QPoint offset(-m_sampleRadius + (offsetIndex % edgeCount) * m_sampleRadius *2,
