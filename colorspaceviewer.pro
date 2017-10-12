@@ -5,6 +5,8 @@ QT += core gui widgets charts
 
 # Input
 
+RESOURCES += images.qrc
+
 HEADERS += \
     chromaticitydiagram.h \
     colorconvert.h \

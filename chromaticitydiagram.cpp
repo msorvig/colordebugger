@@ -27,7 +27,10 @@ ChromaticityDiagram::ChromaticityDiagram() {
     m_scene->addItem(m_chart);
     m_chart->setGeometry(QRectF(QPointF(0,0), QSizeF(size())));
     m_chart->legend()->hide();
-    m_chart->setTitle("CIE Chromaticity");
+    m_chart->setTitle("CIE 1931 xy Chromaticity");
+    m_chart->layout()->setContentsMargins(0, 0, 0, 0);
+    m_chart->setBackgroundRoundness(0);
+
     QLineSeries *series = new QLineSeries();
     m_chart->addSeries(series);
 
@@ -35,14 +38,14 @@ ChromaticityDiagram::ChromaticityDiagram() {
     m_axisX->setRange(0, m_plotRange.x());
     m_axisX->setTickCount(9);
     m_axisX->setLabelFormat("%g");
-    m_axisX->setTitleText("CIE x");
+    m_axisX->setTitleText("x");
     m_chart->setAxisX(m_axisX, series);
 
     m_axisY = new QValueAxis;
     m_axisY->setRange(0, m_plotRange.y());
     m_axisY->setTickCount(10);
     m_axisX->setLabelFormat("%g");
-    m_axisY->setTitleText("CIE y");
+    m_axisY->setTitleText("y");
     m_chart->setAxisY(m_axisY, series);
 
     // Diagram background (monochromoatic light outline, color
@@ -245,6 +248,9 @@ void ChromaticityColorItem::setColor(QColor color, RGBColorSpace colorSpace)
         setVisible(false);
         return;
     }
+
+    qreal Y = Yxy(0, 0);
+    setOpacity((Y > 0) ? 0.5 : 0.2);
 
     setColor(Yxy(1, 0), Yxy(2, 0));
     setRenderColor(color);

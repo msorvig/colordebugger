@@ -21,6 +21,7 @@ enum RgbColorSpace
     ColorSpaceCount
 };
 QString colorSpaceName(RgbColorSpace colorSpace);
+QStringList colorSpaceNames();
 
 // The RGBColorSpace represents a spesific RGB color space defined by the xy
 // coordinates for the red green and blue primaries, and a gamma value. Several
@@ -36,21 +37,29 @@ QString colorSpaceName(RgbColorSpace colorSpace);
 class RGBColorSpace
 {
 public:
+    RGBColorSpace();
+    RGBColorSpace(RgbColorSpace rgbSpace);
     RGBColorSpace(RgbColorSpace rgbSpace, qreal gamma);
     RGBColorSpace(qreal rxy[2], qreal gxy[2], qreal bxy[2],
                   qreal gamma, const QString &name);
 
     QGenericMatrix<1, 3, qreal> convertRGBtoYxy(QColor rgb);
+    QGenericMatrix<1, 3, qreal> convertRGBtoXYZ(QColor rgb);
     QColor convertYxyToRGB(QGenericMatrix<1, 3, qreal> Yxy);
 
-    QGenericMatrix<3, 3, qreal> RGBtoXYZMatrix();
-    QGenericMatrix<3, 3, qreal> XYZtoRGBMatrix();
+    QGenericMatrix<3, 3, qreal> RGBtoXYZMatrix() const;
+    QGenericMatrix<3, 3, qreal> XYZtoRGBMatrix() const;
     qreal gamma();
     QString name();
     
     static QGenericMatrix<3, 3, qreal> createRGBtoRGBMatrix(const RGBColorSpace &source,
                                                             const RGBColorSpace &destination);
+
+    static QColor colorConvert(QColor color, const RGBColorSpace &source, const RGBColorSpace &destination);
+    static void colorConvert(QImage *image, const RGBColorSpace &source, const RGBColorSpace &destination);
+
 private:
+    bool m_isValid;
     qreal m_gamma;
     QString m_name;
     QGenericMatrix<3, 3, qreal> m_RGBtoXYZ;

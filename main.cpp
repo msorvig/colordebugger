@@ -7,6 +7,9 @@ QT_CHARTS_USE_NAMESPACE // wat
 #include "chromaticitydiagram.h"
 #include "colorconvert.h"
 
+// Resolve ambigious activated function
+static auto comboBoxActivatedIntFn = static_cast<void(QComboBox::*)(int)>(&QComboBox::activated);
+
 /*    
 void printPrimaries()
 {
@@ -81,53 +84,310 @@ void thereAndBackAgain()
 
 */
 
-class TestWindow : public QRasterWindow
+class TestContentWidget : public QWidget
 {
 public:
-    TestWindow() {
+    TestContentWidget()
+        :m_sourceColorSpace(sRGB)
+        ,m_targetColorSpace(sRGB)
+        ,m_displayColorSpace(sRGB)
+    {
+        setMouseTracking(true);
+        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
+        // Set default gradient
+        QLinearGradient gradient;
+        gradient.setColorAt(0.1, Qt::green);
+        gradient.setColorAt(0.3, Qt::blue);
+        gradient.setColorAt(0.6, Qt::red);
+        gradient.setColorAt(0.9, Qt::green);
+        setTestGradient(gradient, m_sourceColorSpace);
+    }
+
+    QSize sizeHint() const {
+        return QSize(150, 150);
+    }
+
+    void setTargetColorSpace(const RGBColorSpace &rgbColorSpace)
+    {
+        m_targetColorSpace = rgbColorSpace;
+        update();
+    }
+
+    void setTestImage(const QImage &image, const RGBColorSpace colorSpace) {
+        m_sourceImage = image;
+        m_sourceGradient = QLinearGradient();
+        m_sourceColorSpace = colorSpace;
+        update();
+    }
+
+    void setTestGradient(const QLinearGradient &gradient, const RGBColorSpace colorSpace) {
+        m_sourceGradient = gradient;
+        m_sourceImage = QImage();
+        m_sourceColorSpace = colorSpace;
+        update();
     }
 
     QColor sample(QPoint position) {
         if (position.x() < 0 || position.y() < 0 || position.x() >= width() || position.y() >= height())
             return QColor();
 
-        return m_image.pixelColor(position);
+        return m_targetImage.pixelColor(position);
     }
 
-    void paintEvent(QPaintEvent *ev) {
+    void paintEvent(QPaintEvent *) {
         QRect rect = QRect(QPoint(0, 0), size());
 
+//        qDebug() << "paintEvent" << rect;
+
         // Render to indirect image to get readPixel access.
-        if (m_image.size() != size()) {
-            m_image = QImage(size(), QImage::Format_ARGB32_Premultiplied);
-
-            QPainter p(&m_image);
-            QLinearGradient gradient(rect.topLeft(), rect.bottomRight());
-
-            gradient.setColorAt(0.1, Qt::green);
-            gradient.setColorAt(0.3, Qt::blue);
-            gradient.setColorAt(0.6, Qt::red);
-            gradient.setColorAt(0.9, Qt::green);
-
-            p.fillRect(rect, gradient);
+        if (m_targetImage.size() != size()) {
+            m_targetImage = QImage(size(), QImage::Format_ARGB32_Premultiplied);
         }
 
+        // Content may have changed; re-render
+        {
+            QPainter p(&m_targetImage);
+            if (!m_sourceImage.isNull()) {
+                QImage scaledImage = m_sourceImage.scaled(rect.size());
+                p.fillRect(rect, QBrush(scaledImage));
+            } else {
+                m_sourceGradient.setStart(rect.topLeft());
+                m_sourceGradient.setFinalStop(rect.bottomRight());
+                p.fillRect(rect, QBrush(m_sourceGradient));
+            }
+        }
+
+        RGBColorSpace::colorConvert(&m_targetImage, m_sourceColorSpace, m_targetColorSpace);
+
+        QImage displayImage = m_targetImage.copy();
+        RGBColorSpace::colorConvert(&displayImage, m_targetColorSpace, m_displayColorSpace);
+
         QPainter p(this);
-        p.fillRect(rect, m_image);
+        p.fillRect(rect, displayImage);
 
     }
 private:
-    QImage m_image;
+    QImage m_targetImage;
+    QImage m_sourceImage;
+    QLinearGradient m_sourceGradient;
+    RGBColorSpace m_sourceColorSpace;
+    RGBColorSpace m_targetColorSpace;
+    RGBColorSpace m_displayColorSpace;
+};
+
+class TestSelectorWidget : public QWidget
+{
+public:
+    TestSelectorWidget()
+    {
+        setWindowTitle("Source Selector");
+
+        // Create UI
+        QVBoxLayout *layout = new QVBoxLayout();
+        layout->setSpacing(5);
+        layout->setMargin(5);
+        layout->setAlignment(Qt::AlignBottom);
+        this->setLayout(layout);
+
+        m_contentWidget = new TestContentWidget();
+        m_contentWidget->resize(300, 300);
+        m_contentWidget->setParent(this);
+        layout->addWidget(m_contentWidget);
+
+        // Create test selection UI
+
+        QStringList gradients = { "Gradient" };
+        QStringList images = { "Rose", "Iceland", "YellowFlower" };
+        QList<QStringList> imageVariants = { { "sRGB", "AdobeRGB", "ProPhoto" },
+                                             { "sRGB", "DCI-P3" },
+                                             { "sRGB", "DCI-P3" } };
+        QStringList contents = gradients + images;
+
+        QComboBox *contentSelector = new QComboBox();
+        layout->addWidget(contentSelector);
+        contentSelector->addItems(contents);
+
+        QComboBox *colorSpaceSelector = new QComboBox();
+        layout->addWidget(colorSpaceSelector);
+        colorSpaceSelector->addItems(colorSpaceNames());
+
+        auto selectImageFileName = [=](int imageIndex, int colorSpaceIndex) -> QString {
+
+            // Build image file name
+            QString base = images.at(imageIndex);
+            QString variant = imageVariants.at(imageIndex).at(colorSpaceIndex);
+            QString extention = ".jpg";
+
+            if (variant == "DCI-P3")
+                variant = "P3";
+
+            return  base + "-" + variant + ".jpg";
+        };
+
+        auto setTestContent = [=](int contentIndex, int colorSpaceIndex) {
+            RGBColorSpace sourceColorSpace((RgbColorSpace(colorSpaceIndex)));
+            if (contentIndex < gradients.count()) {
+                QLinearGradient gradient;
+                gradient.setColorAt(0.1, Qt::green);
+                gradient.setColorAt(0.3, Qt::blue);
+                gradient.setColorAt(0.6, Qt::red);
+                gradient.setColorAt(0.9, Qt::green);
+                m_contentWidget->setTestGradient(gradient, sourceColorSpace);
+            } else {
+                int imageIndex = contentIndex - gradients.count();
+                int colorSpaceIndex = colorSpaceSelector->currentIndex();
+                QString imageFileName = selectImageFileName(imageIndex, colorSpaceSelector->currentIndex());
+                QString imageFilePath = ":/images/" + imageFileName;
+                m_contentWidget->setTestImage(QImage(imageFilePath), sourceColorSpace);
+            }
+        };
+
+        auto setColorspaceSelectorContent = [=](int contentIndex) {
+            colorSpaceSelector->setCurrentIndex(0);
+            colorSpaceSelector->clear();
+            if (contentIndex < gradients.count()) {
+                colorSpaceSelector->addItems(colorSpaceNames());
+            } else {
+                int imageIndex = contentIndex - gradients.count();
+                colorSpaceSelector->addItems(imageVariants.at(imageIndex));
+            }
+        };
+
+        connect(contentSelector, comboBoxActivatedIntFn, [=](int i) {
+            setColorspaceSelectorContent(i);
+            setTestContent(i, colorSpaceSelector->currentIndex());
+        });
+
+        connect(colorSpaceSelector, comboBoxActivatedIntFn, [=](int i) {
+            setTestContent(contentSelector->currentIndex(), i);
+        });
+    }
+
+    TestContentWidget *contentWidget() const
+    {
+        return m_contentWidget;
+    }
+
+    void setTargetColorSpace(const RGBColorSpace colorSpace)
+    {
+        m_contentWidget->setTargetColorSpace(colorSpace);
+    }
+
+private:
+    TestContentWidget *m_contentWidget = nullptr;
+};
+
+class ChromaticityDiagramWindow : public QWidget
+{
+public:
+    ChromaticityDiagramWindow()
+        :m_colorSpace(sRGB)
+    {
+        setWindowTitle("Chromaticity Diagram");
+
+        QVBoxLayout *layout = new QVBoxLayout();
+        layout->setContentsMargins(0,0,0,0);
+        setLayout(layout);
+
+        // Add diagram
+        m_chromaticityDiagram = new ChromaticityDiagram();
+        layout->addWidget(m_chromaticityDiagram);
+
+        QString monospacedFont = "Courier New";
+        {
+            // Add line which displays input RGB, XYZ and xyY coordinates
+            QHBoxLayout *line = new QHBoxLayout();
+            line->setAlignment(Qt::AlignLeft);
+            line->addSpacing(10);
+            layout->addLayout(line);
+
+            m_rgbInputColor = new QLabel("RGB: (0.5 0.5, 0.5)");
+            m_rgbInputColor->setFont(QFont(monospacedFont));
+            line->addWidget(m_rgbInputColor);
+
+            m_XYZInputColor = new QLabel("XYZ: (- - -)");
+            m_XYZInputColor->setFont(QFont(monospacedFont));
+            line->addWidget(m_XYZInputColor);
+
+            m_xyColor = new QLabel("xy: (0.5, 0.5)");
+            m_xyColor->setFont(QFont(monospacedFont));
+            line->addWidget(m_xyColor);
+        }
+        {
+            // Add line which displays output/converted RGB
+            QHBoxLayout *line = new QHBoxLayout();
+            line->setAlignment(Qt::AlignLeft);
+            line->addSpacing(10);
+            layout->addLayout(line);
+
+            QComboBox *spaceSelector = new QComboBox();
+            line->addWidget(spaceSelector);
+            spaceSelector->addItems(colorSpaceNames());
+            connect(spaceSelector, comboBoxActivatedIntFn, [this](int i) {
+                m_colorSpace = RGBColorSpace(RgbColorSpace(i));
+            });
+
+            m_rgbConverted = new QLabel("RGB: (0.5 0.5, 0.5)");
+            m_rgbConverted->setFont(QFont(monospacedFont));
+            line->addWidget(m_rgbConverted);
+        }
+
+        layout->addSpacing(5);
+    }
+
+    void setColor(QColor color, RGBColorSpace colorSpace)
+    {
+        if (!color.isValid()) {
+            m_rgbInputColor->setText("RGB: (           )");
+            m_XYZInputColor->setText("XYZ: (              )");
+            m_xyColor->setText("xy: (     )");
+            m_rgbConverted->setText("RGB: (           )");
+            return;
+        }
+
+        m_rgbInputColor->setText(QString("RGB: (%1 %2 %3)").arg(color.red(), 3)
+                                                           .arg(color.green(), 3)
+                                                           .arg(color.blue(), 3));
+
+        auto Yxy = colorSpace.convertRGBtoYxy(color);
+        m_xyColor->setText(QString("xy: (%1 %2)").arg(Yxy(1, 0), 2, 'f', 2)
+                                                 .arg(Yxy(2, 0), 2, 'f', 2));
+
+        auto XYZ = colorSpace.convertRGBtoXYZ(color);
+        m_XYZInputColor->setText(QString("XYZ: (%1 %2 %3)").arg(XYZ(0, 0), 2, 'f', 2)
+                                                           .arg(XYZ(1, 0), 2, 'f', 2)
+                                                           .arg(XYZ(2, 0), 2, 'f', 2));
+
+        // Convert back to (possibly different) RGB color space, as selected by combobox
+        QColor convertedRGB = m_colorSpace.convertYxyToRGB(Yxy);
+        m_rgbConverted->setText(QString("RGB: (%1 %2 %3)").arg(convertedRGB.red(), 3)
+                                                          .arg(convertedRGB.green(), 3)
+                                                          .arg(convertedRGB.blue(), 3));
+    }
+
+    ChromaticityDiagram *diagram()
+    {
+        return m_chromaticityDiagram;
+    }
+
+private:
+    ChromaticityDiagram *m_chromaticityDiagram;
+    QLabel *m_rgbInputColor;
+    QLabel *m_XYZInputColor;
+    QLabel *m_xyColor;
+    QLabel *m_rgbConverted;
+    RGBColorSpace m_colorSpace;
 };
 
 class WindowColorController : public QWidget
 {
 public:
-    WindowColorController(TestWindow *testWindow, ChromaticityDiagram *chromaticityDiagram)
+    WindowColorController(TestContentWidget *testWindow, ChromaticityDiagramWindow *chromaticityDiagramWindow)
     :m_testWindow(testWindow)
-    ,m_colorSpace(sRGB, 1.0)
-    ,m_chromaticityDiagram(chromaticityDiagram)
+    ,m_colorSpace(sRGB)
+    ,m_chromaticityDiagramWindow(chromaticityDiagramWindow)
+    ,m_chromaticityDiagram(m_chromaticityDiagramWindow->diagram())
     ,m_colorItemCount(1)
     ,m_sampleRadius(10)
     {
@@ -138,26 +398,50 @@ public:
         
         // Create UI
         QVBoxLayout *layout = new QVBoxLayout();
-        //layout->setSpacing(0);
+        layout->setSpacing(5);
+        //layout->setMargin(5);
         layout->setAlignment(Qt::AlignTop);
         this->setLayout(layout);
 
         // Create test window configuration UI
-        layout->addWidget(new QLabel("Test Window Color Space"));
+        layout->addWidget(new QLabel("<b>Working Color Space</b>"));
         QComboBox *spaceSelector = new QComboBox();
         layout->addWidget(spaceSelector);
-        for (int i = 0; i < ColorSpaceCount; ++i) {
-            spaceSelector->addItem(colorSpaceName(RgbColorSpace(i)));
-        }
-        auto activatedIntFn = static_cast<void(QComboBox::*)(int)>(&QComboBox::activated);
-        connect(spaceSelector, activatedIntFn, [this](int i) {
-            m_colorSpace = RGBColorSpace(RgbColorSpace(i), 1.0);
+        spaceSelector->addItems(colorSpaceNames());
+        connect(spaceSelector, comboBoxActivatedIntFn, [this](int i) {
+            m_colorSpace = RGBColorSpace(RgbColorSpace(i));
+            m_testWindow->setTargetColorSpace(m_colorSpace);
         });
 
-        layout->addSpacing(10);
+        {
+            QHBoxLayout *displayLayout = new QHBoxLayout();
+            displayLayout->setAlignment(Qt::AlignLeft);
+            layout->addLayout(displayLayout);
+            displayLayout->addWidget(new QLabel("Source -> Workspace:"));
+            QButtonGroup *group = new QButtonGroup(this);
+            QRadioButton *colorConvert = new QRadioButton("Convert");
+            group->addButton(colorConvert);
+            colorConvert->setChecked(true);
+            displayLayout->addWidget(colorConvert);
+            QRadioButton *colorAssign = new QRadioButton("Assign");
+            group->addButton(colorAssign);
+            displayLayout->addWidget(colorAssign);
+        }
+        {
+            QHBoxLayout *displayLayout = new QHBoxLayout();
+            displayLayout->setAlignment(Qt::AlignLeft);
+            layout->addLayout(displayLayout);
+            displayLayout->addWidget(new QLabel("Workspace -> Display:"));
+            QRadioButton *colorConvert = new QRadioButton("Convert");
+            colorConvert->setChecked(true);
+            displayLayout->addWidget(colorConvert);
+            QRadioButton *colorAssign = new QRadioButton("Assign");
+            displayLayout->addWidget(colorAssign);
+            layout->addSpacing(10);
+        }
 
         // Create sampler configuration UI
-        layout->addWidget(new QLabel("Sampler"));
+        layout->addWidget(new QLabel("<b>Sampler</b>"));
 
         QHBoxLayout *samplerConfigLayout = new QHBoxLayout;
         layout->addLayout(samplerConfigLayout);
@@ -203,9 +487,7 @@ public:
             QComboBox *spaceSelector = new QComboBox();
             rowLayout->addWidget(spaceSelector);
             spaceSelector->addItem("<select color space>");
-            for (int i = 0; i < ColorSpaceCount; ++i) {
-                spaceSelector->addItem(colorSpaceName(RgbColorSpace(i)));
-            }
+            spaceSelector->addItems(colorSpaceNames());
 
             // Add "remove" button
             QPushButton *remove = new QPushButton("X");
@@ -213,6 +495,7 @@ public:
             rowLayout->addWidget(remove);
             remove->setEnabled(false);
             connect(remove, &QPushButton::clicked, [layout, rowLayout](bool checked){
+                Q_UNUSED(checked)
                 // Clean up: the layout owns the UI widgets
                 layout->removeItem(rowLayout);
                 rowLayout->deleteLater();
@@ -228,8 +511,7 @@ public:
             rowLayout->addWidget(visible);
 
             // Combox selection changed
-            auto activatedIntFn = static_cast<void(QComboBox::*)(int)>(&QComboBox::activated);
-            connect(spaceSelector, activatedIntFn, [this, item, layout, wasActivated, remove, visible](int i) {
+            connect(spaceSelector, comboBoxActivatedIntFn, [this, item, layout, wasActivated, remove, visible](int i) {
                 if (i < 1) {
                     item->setVisible(false);
                     remove->setEnabled(false);
@@ -237,8 +519,8 @@ public:
                     return;
                 }
 
-                item->setColorSpace(RGBColorSpace(RgbColorSpace(i - 1), 1.0));
-                item->setVisible(true);
+                item->setColorSpace(RGBColorSpace(RgbColorSpace(i - 1)));
+                item->setVisible(visible->isChecked());
                 remove->setEnabled(true);
                 visible->setEnabled(true);
 
@@ -250,11 +532,11 @@ public:
             });
         };
         
-        layout->addWidget(new QLabel("Diagram Color Spaces"));
+        layout->addWidget(new QLabel("<b>Diagram Color Spaces</b>"));
         m_addColorSelector(layout);
     }
 
-    bool eventFilter(QObject *object, QEvent *ev)
+    bool eventFilter(QObject *, QEvent *ev)
     {
         if (ev->type() == QEvent::MouseMove)
             return filterMouseMoveEvent(static_cast<QMouseEvent *>(ev));
@@ -281,12 +563,14 @@ public:
             }
         }
 
-
         // First point: sample at cursor position
         QColor color = m_testWindow->sample(pos);
         m_items.at(0)->setColor(color, m_colorSpace);
 
-        // Sample test window at/around cursor position.
+        // Set main color for RGB/XYZ output
+        m_chromaticityDiagramWindow->setColor(color, m_colorSpace);
+
+        // Rest of the points: sample around cursor position
         for (int i = 1; i < m_colorItemCount; ++i) {
 
             // Square around pos
@@ -303,55 +587,53 @@ public:
         return false;
     }
 
-    bool filterLeaveEvent(QEvent *e) {
+    bool filterLeaveEvent(QEvent *) {
         for (auto item : m_items)
             item->setVisible(false);
+
+        m_chromaticityDiagramWindow->setColor(QColor(), m_colorSpace);
 
         return false;
     }
 
 private:
-    TestWindow *m_testWindow;
+    TestContentWidget *m_testWindow;
     RGBColorSpace m_colorSpace;
+    ChromaticityDiagramWindow *m_chromaticityDiagramWindow;
     ChromaticityDiagram *m_chromaticityDiagram;
+
     int m_colorItemCount;
     int m_sampleRadius;
     QList<ChromaticityColorItem *> m_items;
     std::function<void(QVBoxLayout *)> m_addColorSelector;
 };
 
-class ColorViewer : public QWidget
-{
-public:
-    ColorViewer() {
-
-    }
-
-
-private:
-
-
-};
-
 int main(int argc, char ** argv)
 {
     QApplication app(argc, argv);
 
+    // Tests
+    extern void colorConvertTest();
+    colorConvertTest();
+    //return 0;
+
  //   printPrimaries();
 //    thereAndBackAgain();
  //   printMonochromatic();
-    fromPrimaries();
+//    fromPrimaries();
 
-    TestWindow testWindow;
-    testWindow.setTitle("Test Window");
-    ChromaticityDiagram chromaticityDiagram;
-    WindowColorController controller(&testWindow, &chromaticityDiagram);
+    TestSelectorWidget testSelectorWidget;
+    testSelectorWidget.show();
+
+    ChromaticityDiagramWindow chromaticityDiagram;
+
+    WindowColorController controller(testSelectorWidget.contentWidget(), &chromaticityDiagram);
 
     // Show all windows
 
-    testWindow.setGeometry(100, 100, 300, 300);
-    testWindow.raise();
-    testWindow.show();
+    testSelectorWidget.setGeometry(100, 100, 300, 300);
+    testSelectorWidget.raise();
+    testSelectorWidget.show();
 
     chromaticityDiagram.setGeometry(600, 100, 500, 600);
     chromaticityDiagram.raise();

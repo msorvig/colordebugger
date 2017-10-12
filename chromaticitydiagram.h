@@ -41,7 +41,7 @@ private:
     QValueAxis *m_axisX;
     QValueAxis *m_axisY;
     
-    QPointF m_plotRangeMinimum = QPointF(0.8, 0.9);;
+    QPointF m_plotRangeMinimum = QPointF(0.8, 0.9);
     QPointF m_plotRange = m_plotRangeMinimum;
 
     QList<ChromaticityColorItem *> m_colorItems;
