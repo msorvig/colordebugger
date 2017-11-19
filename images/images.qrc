@@ -1,0 +1,11 @@
+<!DOCTYPE RCC><RCC version="1.0">
+<qresource prefix="/images">
+    <file>Iceland-P3.jpg</file>
+    <file>Iceland-sRGB.jpg</file>
+    <file>Rose-sRGB.jpg</file>
+    <file>Rose-ProPhoto.jpg</file>
+    <file>Rose-AdobeRGB.jpg</file>
+    <file>YellowFlower-sRGB.jpg</file>
+    <file>YellowFlower-P3.jpg</file>
+</qresource>
+</RCC>

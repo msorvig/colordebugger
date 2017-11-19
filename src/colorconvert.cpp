@@ -249,7 +249,7 @@ QGenericMatrix<1, 3, qreal> XYZtoYxy(QGenericMatrix<1, 3, qreal> XYZ)
     const qreal sum = X + Y + Z;
     if (sum < 0.01) {
         // Black / dark grey colors cause numerical instability when the small
-        // small is used as a divisor below. Return the xy coordinates for the
+        // sum is used as a divisor below. Return the xy coordinates for the
         // white point (hardcode D65), whith a Y component of 0.
         const qreal Yxy[] = { 0, 0.3127, 0.3290 };
         return QGenericMatrix<1, 3, qreal>(Yxy);
@@ -468,8 +468,8 @@ void RGBColorSpace::colorConvert(QImage *image, const RGBColorSpace &source, con
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
-#define COMPARE(a, b) if (!(a == b)) qFatal((QString("Test fail at %1:%2").arg(__FILE__).arg(TOSTRING(__LINE__))).toLocal8Bit().constData());
-#define VERIFY(a) if (!(a)) qFatal((QString("Test fail at %1:%2").arg(__FILE__).arg(TOSTRING(__LINE__))).toLocal8Bit().constData());
+#define COMPARE(a, b) if (!(a == b)) qFatal("%s", QString("Test fail at %1:%2").arg(__FILE__).arg(TOSTRING(__LINE__)).toLocal8Bit().constData());
+#define VERIFY(a) if (!(a)) qFatal("%s", QString("Test fail at %1:%2").arg(__FILE__).arg(TOSTRING(__LINE__)).toLocal8Bit().constData());
 
 // qFuzzyCompare is to strict for our use case.
 bool almostEqual(qreal a, qreal b)
