@@ -416,7 +416,8 @@ public:
         {
             QHBoxLayout *displayLayout = new QHBoxLayout();
             displayLayout->setAlignment(Qt::AlignLeft);
-            layout->addLayout(displayLayout);
+            // disabled
+            // layout->addLayout(displayLayout);
             displayLayout->addWidget(new QLabel("Source -> Workspace:"));
             QButtonGroup *group = new QButtonGroup(this);
             QRadioButton *colorConvert = new QRadioButton("Convert");
@@ -430,7 +431,8 @@ public:
         {
             QHBoxLayout *displayLayout = new QHBoxLayout();
             displayLayout->setAlignment(Qt::AlignLeft);
-            layout->addLayout(displayLayout);
+            // disabled
+            // layout->addLayout(displayLayout);
             displayLayout->addWidget(new QLabel("Workspace -> Display:"));
             QRadioButton *colorConvert = new QRadioButton("Convert");
             colorConvert->setChecked(true);
@@ -606,6 +608,35 @@ private:
     int m_sampleRadius;
     QList<ChromaticityColorItem *> m_items;
     std::function<void(QVBoxLayout *)> m_addColorSelector;
+};
+
+
+class QImageColorDebugger
+{
+public:
+    QImageColorDebugger();
+
+    void setImage(const QImage &image, RGBColorSpace colorSpace);
+    QImage image();
+
+    void setDiagramColorSpaces(QList<RGBColorSpace> colorSpaces);
+    void setSamplePointCount(int count);
+    void setSamplePointRadious(int radius);
+    void setSamplePosition(QPoint imagePosition);
+
+    void setDebuggerVisisble(bool visible);
+
+    void setImageViewerVisible(bool visible);
+    bool imageViewerVisible() const;
+
+    void setChromaticityDiagramVisible(bool visible);
+    bool chromaticityDiagramVisible() const;
+
+    void setSampleControllerVisible(bool visible);
+    bool sampleControllerVisible() const;
+
+private:
+
 };
 
 int main(int argc, char ** argv)

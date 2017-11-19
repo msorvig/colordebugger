@@ -17,3 +17,4 @@ SOURCES += \
     colorconvert.cpp
 
 SOURCES += main.cpp
+

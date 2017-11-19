@@ -22,10 +22,8 @@ class ChromaticityDiagram : public QGraphicsView
 {
 public:
     ChromaticityDiagram();
-
     void addColorItem(ChromaticityColorItem *colorItem);
     void clearColorItems();
-
     void addColorProfileItem(ChromaticityColorProfileItem *colorProfileItem);
 
 protected:
@@ -55,7 +53,6 @@ public:
     ChromaticityColorItem();
     void setColor(QColor color, RGBColorSpace colorSpace);
     void setColor(qreal x, qreal y);
-
 
 private:
     friend class ChromaticityDiagram;
