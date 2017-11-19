@@ -51,6 +51,10 @@ class ChromaticityColorItem : public QGraphicsEllipseItem
 {
 public:
     ChromaticityColorItem();
+/*
+    Property<tuple<QColor, RGBColorSpace>> rgbColor;
+    Property<tuple<qreal, qreal>> xyColor;
+*/
     void setColor(QColor color, RGBColorSpace colorSpace);
     void setColor(qreal x, qreal y);
 

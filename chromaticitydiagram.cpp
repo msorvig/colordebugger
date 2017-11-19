@@ -234,6 +234,38 @@ ChromaticityColorItem::ChromaticityColorItem()
     setPen(cosmetic);
 
     setBrush(QColor(Qt::gray));
+
+/*
+
+    rgbColor >> [this](tuple<QColor, RGBColorSpace> colorSpec) -> tuple<qreal, qreal> {
+
+        QColor color = get<0>(colorSpec);
+        RGBColorSpace space = get<1>(colorSpec);
+
+        auto Yxy = colorSpace.convertRGBtoYxy(color);
+        qreal Y = Yxy(0, 0);
+        qreal x = Yxy(1, 0);
+        qreal y = Yxy(2, 0);
+        bool isValidColor = color.isValid() && !std::isnan(x) && !std::isnan(y);
+
+        setVisible(isValidColor);
+        if (!isValidColor)
+            return make_tuple(0, 0);
+
+        setOpacity((Y > 0) ? 0.5 : 0.2);
+        setRenderColor(color);
+
+        return make_tuple(x, y);
+
+    } >> xyColor;
+
+    xyColor >> [this](tuple<qreal, qreal> xyColor) {
+
+        m_xy = QPointF(x, y);
+        setScenePos();
+
+    };
+*/
 }
 
 // Set RGB color
