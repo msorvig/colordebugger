@@ -1,0 +1,88 @@
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <style>
+
+    body {
+        margin: 40px;
+        width: 600px;
+    }
+    
+    img {
+        border-radius: 3%;
+    }
+    .wrapper {
+      display: grid;
+      grid-template-columns: 200px 200px 200px;
+      grid-gap: 10px;
+      background-color: #fff;
+      color: #444;
+    }
+    
+    .box {
+      font-size: 150%;
+      text-align: center;
+    }
+        
+    #qt-html-container {
+        width: 400px;
+        height: 400px;
+
+        /* Center Qt Placeholder content */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    </style>
+</head>
+<body onload="init()">
+    <div>
+        <h2>
+        Wide Color
+        </h2>
+        <p>NOTE WORK IN PROGRESS</p>
+        
+        Modern displays support wider color gamuts, but can you
+        spot the difference between standard and wide color gamut images?
+        Use the color debugger below if needed.
+        <br><br>
+        <font size="1">(No, they are not all the same image)</font>
+        <br><br>
+                
+        <div class="wrapper">
+          <div class="box">sRGB</div>
+          <div class="box">AdobeRGB</div>
+          <div class="box">ProPhoto</div>
+          <img src="Rose-sRGB.jpg" width="200px" height = "200px"></img>
+          <img src="Rose-AdobeRGB.jpg" width="200px" height = "200px"></img>
+          <img src="Rose-ProPhoto.jpg" width="200px" height = "200px"></img>
+        </div>
+        <br>
+        <font size="2">Image source: <a href = "https://webkit.org/blog-files/color-gamut/">webkit.org</a></font>
+    </div>
+    
+    <br>
+    
+    <h3>
+    Color Debugger - Click to load, then mouse over images.
+    </h3>
+    
+    <div id="qt-html-container" allign="center">
+        <img id="qt-html-basic" src="chromadiagram.png" width="100%" height="100%"></img>
+    </div>
+    <script>
+        var loader = undefined;
+        
+        function init() {
+            loader = QtProgressiveEnhancementLoader({
+                name : "html"
+            });
+
+            loader.load();
+        }
+        
+
+    </script>
+    <script async type="text/javascript" src="qtprogressiveenhancementloader.js"></script>
+</body>
+</html>
