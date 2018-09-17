@@ -1,5 +1,8 @@
 TEMPLATE = subdirs
-SUBDIRS +=\
-  chromaticitydiagram \
-  colordebugger\
-  
+wasm {
+    SUBDIRS += web
+} else {
+    SUBDIRS +=\
+      chromaticitydiagram \
+      colordebugger\
+}
