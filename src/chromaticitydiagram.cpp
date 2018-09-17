@@ -25,6 +25,7 @@ ChromaticityDiagram::ChromaticityDiagram() {
     // Add QChart to display aces
     m_chart = new QChart();
     m_scene->addItem(m_chart);
+    m_chart->setFlags(m_chart->flags() & ~QGraphicsItem::ItemIsMovable);
     m_chart->setGeometry(QRectF(QPointF(0,0), QSizeF(size())));
     m_chart->legend()->hide();
     m_chart->setTitle("CIE 1931 xy Chromaticity");

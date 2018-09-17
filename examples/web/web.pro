@@ -1,5 +1,6 @@
 TEMPLATE = app
 
+TARGET = colordebugger
 include(../../src/colordebugger.pri)
 
 SOURCES += main.cpp

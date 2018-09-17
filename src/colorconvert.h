@@ -40,6 +40,10 @@ public:
     RGBColorSpace();
     RGBColorSpace(RgbColorSpace rgbSpace);
     RGBColorSpace(RgbColorSpace rgbSpace, qreal gamma);
+    RGBColorSpace(const std::array<qreal, 8> &primaries, 
+                  const std::array<std::function<qreal(qreal)>, 2> &transferFunctions,
+                  const QString &name = 0);
+    RGBColorSpace(const std::array<qreal, 8> &primaries, const QString &name);
     RGBColorSpace(qreal rxy[2], qreal gxy[2], qreal bxy[2],
                   qreal gamma, const QString &name);
 
@@ -60,8 +64,8 @@ public:
 
 private:
     bool m_isValid;
-    qreal m_gamma;
     QString m_name;
+    qreal m_gamma;
     QGenericMatrix<3, 3, qreal> m_RGBtoXYZ;
     QGenericMatrix<3, 3, qreal> m_XYZtoRGB;
 };

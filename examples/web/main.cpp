@@ -3,17 +3,15 @@
 #include <QtWidgets>
 #include <QtCharts>
 
+#ifdef Q_OS_WASM
 #include "emscripten.h"
+#endif
 
 QT_CHARTS_USE_NAMESPACE
     
 #include "chromaticitydiagram.h"
-#include "colorconvert.h"
 
-// Resolve ambigious activated function
-static auto comboBoxActivatedIntFn = static_cast<void(QComboBox::*)(int)>(&QComboBox::activated);
-
-class ChromaticityDiagramWindow : public QWidget
+    class ChromaticityDiagramWindow : public QWidget
 {
 public:
     ChromaticityDiagramWindow()
@@ -38,14 +36,17 @@ public:
             layout->addLayout(line);
 
             m_rgbInputColor = new QLabel("RGB: (0.5 0.5, 0.5)");
+            m_rgbInputColor->setTextInteractionFlags(Qt::TextSelectableByMouse);
             m_rgbInputColor->setFont(QFont(monospacedFont));
             line->addWidget(m_rgbInputColor);
 
             m_XYZInputColor = new QLabel("XYZ: (- - -)");
+            m_XYZInputColor->setTextInteractionFlags(Qt::TextSelectableByMouse);
             m_XYZInputColor->setFont(QFont(monospacedFont));
             line->addWidget(m_XYZInputColor);
 
             m_xyColor = new QLabel("xy: (0.5, 0.5)");
+            m_xyColor->setTextInteractionFlags(Qt::TextSelectableByMouse);
             m_xyColor->setFont(QFont(monospacedFont));
             line->addWidget(m_xyColor);
         }
@@ -100,9 +101,13 @@ int main(int argc, char ** argv)
 //    chromaticityDiagram.winId();
 //    chromaticityDiagram.windowHandle()->showMaximized();
 
-//    chromaticityDiagram.showFullScreen();
+#ifdef Q_OS_WASM
+    chromaticityDiagram.showFullScreen();
+#else
+    chromaticityDiagram.show();
+#endif    
     
-#ifdef Q_OS_HTML5
+#ifdef Q_OS_WASM
     // Signal that the application is ready. This should ideally be
     // done after we have painted the first frame.
     EM_ASM(console.log("appReady"));
