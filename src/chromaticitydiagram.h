@@ -32,6 +32,7 @@ protected:
     bool gestureEvent(QGestureEvent *event);
     bool pinchGestureEvent(QPinchGesture *gesture);
     void resizeEvent(QResizeEvent *ev);
+    void wheelEvent(QWheelEvent * event);
 
 private:
     QGraphicsScene *m_scene;

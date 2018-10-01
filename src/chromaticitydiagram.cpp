@@ -200,6 +200,15 @@ void ChromaticityDiagram::resizeEvent(QResizeEvent *ev) {
     QGraphicsView::resizeEvent(ev);
 }
 
+void ChromaticityDiagram::wheelEvent(QWheelEvent *event)
+{
+#ifdef Q_OS_WASM
+     // wasm: don't scroll on wheel
+    Q_UNUSED(event);
+#else 
+    QGraphicsView::wheelEvent(event)
+#endif
+}
 
 void ChromaticityDiagram::addColorItem(ChromaticityColorItem *colorItem) {
     m_scene->addItem(colorItem);
