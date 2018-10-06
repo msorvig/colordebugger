@@ -13,3 +13,4 @@ MOC_DIR = .moc
 QMAKE_POST_LINK += $$QMAKE_COPY $$quote($$PWD/../../images/Rose-sRGB.jpg) $$quote($$OUT_PWD) $$escape_expand(\n\t)
 QMAKE_POST_LINK += $$QMAKE_COPY $$quote($$PWD/../../images/Rose-AdobeRGB.jpg) $$quote($$OUT_PWD) $$escape_expand(\n\t)
 QMAKE_POST_LINK += $$QMAKE_COPY $$quote($$PWD/../../images/Rose-ProPhoto.jpg) $$quote($$OUT_PWD) $$escape_expand(\n\t)
+QMAKE_POST_LINK += $$QMAKE_COPY $$quote($$PWD/index.html) $$quote($$OUT_PWD) $$escape_expand(\n\t)
