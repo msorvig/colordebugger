@@ -122,6 +122,7 @@
             }
 
             var qtLoader = QtLoader({
+                canvasElements : [canvas],
                 showLoader: function(loaderStatusText) {
                     setColorDebuggerVisible(false);
                     console.log("showLoader " + loaderStatusText);
@@ -139,7 +140,6 @@
                 showCanvas: function() {
                     setColorDebuggerVisible(true);
                     console.log("showCanvas");
-                    return canvas;
                 },
             });
             qtLoader.loadEmscriptenModule("colordebugger");
